@@ -6,7 +6,7 @@ deploy:
   bucket: stackage-travis
   acl: public_read
   skip_cleanup: true
-  local_dir: dist/build/stackage-curator
+  local_dir: to-travis
   upload-dirs: stackage-curator
 
 env:
@@ -43,3 +43,8 @@ script:
       echo "expected '$SRC_TGZ' not found";
       exit 1;
    fi
+
+ - mkdir -p to-travis
+ - cp dist/build/stackage-curator/stackage-curator to-travis
+ - strip to-travis/stackage-curator
+ - bzip2 to-travis/stackage-curator
