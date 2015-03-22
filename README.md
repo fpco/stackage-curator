@@ -1,5 +1,7 @@
 ## stackage-curator
 
+[![Build Status](https://travis-ci.org/fpco/stackage-curator.svg?branch=master)](https://travis-ci.org/fpco/stackage-curator)
+
 This repository contains the code for curating Stackage package sets and
 building reusable package databases. It was originally simply called the
 stackage package and was part of the stackage repository, but since this is a
