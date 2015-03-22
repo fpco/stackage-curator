@@ -103,4 +103,4 @@ test-suite spec
 
 source-repository head
   type:     git
-  location: https://github.com/fpco/stackage
+  location: https://github.com/fpco/stackage-curator
