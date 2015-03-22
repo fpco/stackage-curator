@@ -32,6 +32,7 @@ import qualified System.PosixCompat.Time   as PC
 import qualified Text.XML                  as X
 import           Text.XML.Cursor
 import System.PosixCompat.Files (createSymbolicLink)
+import Stackage.Types
 
 -- | Get current time
 epochTime :: IO Tar.EpochTime
@@ -83,23 +84,6 @@ serverBundle time title slug bp@BuildPlan {..} = GZip.compress $ Tar.write
             map (\(PackageName name) -> name)
                 (M.keys $ siCorePackages bpSystemInfo)
 
--- | Package name is key
-type DocMap = Map Text PackageDocs
-data PackageDocs = PackageDocs
-    { pdVersion :: Text
-    , pdModules :: Map Text [Text]
-    -- ^ module name, path
-    }
-instance ToJSON PackageDocs where
-    toJSON PackageDocs {..} = object
-        [ "version" .= pdVersion
-        , "modules" .= pdModules
-        ]
-instance FromJSON PackageDocs where
-    parseJSON = withObject "PackageDocs" $ \o -> PackageDocs
-        <$> o .: "version"
-        <*> o .: "modules"
-
 docsListing :: BuildPlan
             -> FilePath -- ^ docs directory
             -> IO DocMap
@@ -139,29 +123,6 @@ docsListing bp docsDir =
                     , pdModules = m
                     }
             else return mempty
-
-data SnapshotType = STNightly
-                  | STLTS !Int !Int -- ^ major, minor
-    deriving (Show, Read, Eq, Ord)
-
-instance ToJSON SnapshotType where
-    toJSON STNightly = object
-        [ "type" .= asText "nightly"
-        ]
-    toJSON (STLTS major minor) = object
-        [ "type" .= asText "lts"
-        , "major" .= major
-        , "minor" .= minor
-        ]
-instance FromJSON SnapshotType where
-    parseJSON = withObject "SnapshotType" $ \o -> do
-        t <- o .: "type"
-        case asText t of
-            "nightly" -> return STNightly
-            "lts" -> STLTS
-                <$> o .: "major"
-                <*> o .: "minor"
-            _ -> fail $ "Unknown type for SnapshotType: " ++ unpack t
 
 data CreateBundleV2 = CreateBundleV2
     { cb2Plan :: BuildPlan

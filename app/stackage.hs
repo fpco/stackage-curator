@@ -8,7 +8,7 @@ import Data.String (fromString)
 import Data.Version
 import Options.Applicative
 import Filesystem.Path.CurrentOS (decodeString)
-import Paths_stackage (version)
+import Paths_stackage_curator (version)
 import Stackage.CompleteBuild
 import Stackage.Upload
 import Stackage.InstallBuild

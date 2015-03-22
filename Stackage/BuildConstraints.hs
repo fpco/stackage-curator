@@ -28,57 +28,6 @@ import           Network.HTTP.Client         (Manager, httpLbs, responseBody, Re
 import           Stackage.CorePackages
 import           Stackage.Prelude
 
-data TestState = ExpectSuccess
-               | ExpectFailure
-               | Don'tBuild -- ^ when the test suite will pull in things we don't want
-    deriving (Show, Eq, Ord, Bounded, Enum)
-
-testStateToText :: TestState -> Text
-testStateToText ExpectSuccess = "expect-success"
-testStateToText ExpectFailure = "expect-failure"
-testStateToText Don'tBuild    = "do-not-build"
-
-instance ToJSON TestState where
-    toJSON = toJSON . testStateToText
-instance FromJSON TestState where
-    parseJSON = withText "TestState" $ \t ->
-        case lookup t states of
-            Nothing -> fail $ "Invalid state: " ++ unpack t
-            Just v -> return v
-      where
-        states = asHashMap $ mapFromList
-               $ map (\x -> (testStateToText x, x)) [minBound..maxBound]
-
-data SystemInfo = SystemInfo
-    { siGhcVersion      :: Version
-    , siOS              :: OS
-    , siArch            :: Arch
-    , siCorePackages    :: Map PackageName Version
-    , siCoreExecutables :: Set ExeName
-    }
-    deriving (Show, Eq, Ord)
-instance ToJSON SystemInfo where
-    toJSON SystemInfo {..} = object
-        [ "ghc-version" .= display siGhcVersion
-        , "os" .= display siOS
-        , "arch" .= display siArch
-        , "core-packages" .= Map.mapKeysWith const unPackageName (map display siCorePackages)
-        , "core-executables" .= siCoreExecutables
-        ]
-instance FromJSON SystemInfo where
-    parseJSON = withObject "SystemInfo" $ \o -> do
-        let helper name = (o .: name) >>= either (fail . show) return . simpleParse
-        siGhcVersion <- helper "ghc-version"
-        siOS <- helper "os"
-        siArch <- helper "arch"
-        siCorePackages <- (o .: "core-packages") >>= goPackages
-        siCoreExecutables <- o .: "core-executables"
-        return SystemInfo {..}
-      where
-        goPackages = either (fail . show) return
-                   . mapM simpleParse
-                   . Map.mapKeysWith const mkPackageName
-
 data BuildConstraints = BuildConstraints
     { bcPackages           :: Set PackageName
     -- ^ This does not include core packages.
@@ -89,39 +38,6 @@ data BuildConstraints = BuildConstraints
     , bcGithubUsers        :: Map Text (Set Text)
     -- ^ map an account to set of pingees
     }
-
-data PackageConstraints = PackageConstraints
-    { pcVersionRange     :: VersionRange
-    , pcMaintainer       :: Maybe Maintainer
-    , pcTests            :: TestState
-    , pcHaddocks         :: TestState
-    , pcBuildBenchmarks  :: Bool
-    , pcFlagOverrides    :: Map FlagName Bool
-    , pcEnableLibProfile :: Bool
-    }
-    deriving (Show, Eq)
-instance ToJSON PackageConstraints where
-    toJSON PackageConstraints {..} = object $ addMaintainer
-        [ "version-range" .= display pcVersionRange
-        , "tests" .= pcTests
-        , "haddocks" .= pcHaddocks
-        , "build-benchmarks" .= pcBuildBenchmarks
-        , "flags" .= Map.mapKeysWith const unFlagName pcFlagOverrides
-        , "library-profiling" .= pcEnableLibProfile
-        ]
-      where
-        addMaintainer = maybe id (\m -> (("maintainer" .= m):)) pcMaintainer
-instance FromJSON PackageConstraints where
-    parseJSON = withObject "PackageConstraints" $ \o -> do
-        pcVersionRange <- (o .: "version-range")
-                      >>= either (fail . show) return . simpleParse
-        pcTests <- o .: "tests"
-        pcHaddocks <- o .: "haddocks"
-        pcBuildBenchmarks <- o .: "build-benchmarks"
-        pcFlagOverrides <- Map.mapKeysWith const mkFlagName <$> o .: "flags"
-        pcMaintainer <- o .:? "maintainer"
-        pcEnableLibProfile <- fmap (fromMaybe True) (o .:? "library-profiling")
-        return PackageConstraints {..}
 
 -- | The proposed plan from the requirements provided by contributors.
 --

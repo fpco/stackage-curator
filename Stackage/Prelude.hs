@@ -23,52 +23,7 @@ import qualified Distribution.Version            as C
 import           Filesystem                      (createTree)
 import           Filesystem.Path                 (parent)
 import qualified Filesystem.Path                 as F
-
-unPackageName :: PackageName -> Text
-unPackageName (PackageName str) = pack str
-
-unFlagName :: FlagName -> Text
-unFlagName (FlagName str) = pack str
-
-mkPackageName :: Text -> PackageName
-mkPackageName = PackageName . unpack
-
-mkFlagName :: Text -> FlagName
-mkFlagName = FlagName . unpack
-
-display :: DT.Text a => a -> Text
-display = fromString . DT.display
-
-simpleParse :: (MonadThrow m, DT.Text a, Typeable a) => Text -> m a
-simpleParse orig = withTypeRep $ \rep ->
-    case DT.simpleParse str of
-        Nothing -> throwM (ParseFailedException rep (pack str))
-        Just v  -> return v
-  where
-    str = unpack orig
-
-    withTypeRep :: Typeable a => (TypeRep -> m a) -> m a
-    withTypeRep f =
-        res
-      where
-        res = f (typeOf (unwrap res))
-
-        unwrap :: m a -> a
-        unwrap _ = error "unwrap"
-
-data ParseFailedException = ParseFailedException TypeRep Text
-    deriving (Show, Typeable)
-instance Exception ParseFailedException
-
-newtype Maintainer = Maintainer { unMaintainer :: Text }
-    deriving (Show, Eq, Ord, Hashable, ToJSON, FromJSON, IsString)
-
--- | Name of an executable.
-newtype ExeName = ExeName { unExeName :: Text }
-    deriving (Show, Eq, Ord, Hashable, ToJSON, FromJSON, IsString)
-
-intersectVersionRanges :: VersionRange -> VersionRange -> VersionRange
-intersectVersionRanges x y = C.simplifyVersionRange $ C.intersectVersionRanges x y
+import Stackage.Types as X
 
 -- | There seems to be a bug in Cabal where serializing and deserializing
 -- version ranges winds up with different representations. So we have a
