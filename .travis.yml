@@ -8,6 +8,9 @@ deploy:
   skip_cleanup: true
   local_dir: to-travis
   upload-dirs: stackage-curator
+  on:
+    repo: fpco/stackage-curator
+    branch: master
 
 env:
  - CABALVER=1.20 GHCVER=7.8.4
@@ -30,6 +33,12 @@ script:
  - if [ -f configure.ac ]; then autoreconf -i; fi
  - cabal configure --enable-tests --enable-benchmarks -v2  # -v2 provides useful information for debugging
  - cabal build   # this builds all libraries and executables (including tests/benchmarks)
+
+ - mkdir -p to-travis
+ - cp dist/build/stackage-curator/stackage-curator to-travis
+ - strip to-travis/stackage-curator
+ - bzip2 to-travis/stackage-curator
+
  - cabal test
  - cabal check
  - cabal sdist   # tests that a source-distribution can be generated
@@ -43,8 +52,3 @@ script:
       echo "expected '$SRC_TGZ' not found";
       exit 1;
    fi
-
- - mkdir -p to-travis
- - cp dist/build/stackage-curator/stackage-curator to-travis
- - strip to-travis/stackage-curator
- - bzip2 to-travis/stackage-curator
