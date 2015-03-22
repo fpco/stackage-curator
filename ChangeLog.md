@@ -1,3 +1,7 @@
+## 0.7.0
+
+* Renamed to stackage-curator
+
 ## 0.6.1
 
 * Switch to V2 upload by default
