@@ -1,3 +1,14 @@
+deploy:
+  provider: s3
+  access_key_id: AKIAI5DCW74VHQYKQPAA
+  secret_access_key:
+    secure: jV7LhIXkrYZFGiaHtOGRu4FJau8xtbmflf4CNR2hfxTwUTIMKwEG9JMrZREFTHg3UK/RjlKiA3nIkKSbMZ6raCA4nLfAfJVJxr8ku7ZvSzVAFprcg1y98k87tdQzO5aF/BdfMdoz+SxcXynx02veTk9baeHvUn672Fuhil2Jc+U=
+  bucket: stackage-travis
+  acl: public_read
+  skip_cleanup: true
+  local_dir: dist/build/stackage-curator
+  upload-dirs: stackage-curator
+
 env:
  - CABALVER=1.20 GHCVER=7.8.4
 
