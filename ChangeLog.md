@@ -1,3 +1,7 @@
+## 0.7.0.2
+
+* Deal better with invariant violations around unregistered packages
+
 ## 0.7.0
 
 * Renamed to stackage-curator

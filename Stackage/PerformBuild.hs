@@ -368,6 +368,8 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} =
 
     PackageConstraints {..} = ppConstraints $ piPlan sbPackageInfo
 
+    hasLib = not $ null $ sdModules $ ppDesc $ piPlan sbPackageInfo
+
     buildLibrary = wf libOut $ \getOutH -> do
         let run a b = do when pbVerbose $ log' (unwords (a : b))
                          runChild getOutH a b
@@ -389,8 +391,18 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} =
                 inner
 
         prevBuildResult <- getPreviousResult pb Build pident
-        unless (prevBuildResult == PRSuccess) $ withConfiged $ do
-          assert (pname `notMember` registeredPackages) $ do
+        toBuild <- case () of
+            ()
+                | prevBuildResult /= PRSuccess -> return True
+                | pname `notMember` registeredPackages && hasLib -> do
+                    log' $ concat
+                        [ "WARNING: Package "
+                        , display pname
+                        , " marked as build success, but not registered"
+                        ]
+                    return True
+                | otherwise -> return False
+        when toBuild $ withConfiged $ do
             deletePreviousResults pb pident
 
             log' $ "Building " ++ namever
