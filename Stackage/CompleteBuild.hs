@@ -1,6 +1,7 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE NoImplicitPrelude  #-}
+{-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE RecordWildCards    #-}
 module Stackage.CompleteBuild
     ( BuildType (..)
     , BumpType (..)
@@ -45,7 +46,7 @@ data BuildFlags = BuildFlags
     , bfBuildHoogle      :: !Bool
     } deriving (Show)
 
-data BuildType = Nightly | LTS BumpType
+data BuildType = Nightly | LTS BumpType Text
     deriving (Show, Read, Eq, Ord)
 
 data BumpType = Major | Minor
@@ -93,6 +94,20 @@ nightlySettings day plan' = Settings
   where
     slug' = "nightly-" ++ day
 
+parseGoal :: MonadThrow m => Text -> m (LTSVer -> Bool)
+parseGoal "" = return $ const True
+parseGoal t =
+    case decimal t of
+        Right (major, "") -> return $ \(LTSVer major' _) -> major' <= major
+        _ ->
+            case parseLTSRaw t of
+                Nothing -> throwM $ ParseGoalFailure t
+                Just x -> return (< x)
+
+data ParseGoalFailure = ParseGoalFailure Text
+    deriving (Show, Typeable)
+instance Exception ParseGoalFailure
+
 getSettings :: Manager -> BuildType -> IO Settings
 getSettings man Nightly = do
     day <- tshow . utctDay <$> getCurrentTime
@@ -100,10 +115,13 @@ getSettings man Nightly = do
     pkgs <- getLatestAllowedPlans bc
     plan' <- newBuildPlan pkgs bc
     return $ nightlySettings day plan'
-getSettings man (LTS bumpType) = do
+getSettings man (LTS bumpType goal) = do
+    matchesGoal <- parseGoal goal
     Option mlts <- fmap (fmap getMax) $ runResourceT
         $ sourceDirectory "."
-       $$ foldMapC (Option . fmap Max . parseLTSVer . filename)
+       $= concatMapC (parseLTSVer . filename)
+       $= filterC matchesGoal
+       $$ foldMapC (Option . Just . Max)
 
     (new, plan') <- case bumpType of
         Major -> do
@@ -167,10 +185,15 @@ parseLTSVer :: FilePath -> Maybe LTSVer
 parseLTSVer fp = do
     w <- stripPrefix "lts-" $ fpToText fp
     x <- stripSuffix ".yaml" w
+    parseLTSRaw x
+
+parseLTSRaw :: Text -> Maybe LTSVer
+parseLTSRaw x = do
     Right (major, y) <- Just $ decimal x
     z <- stripPrefix "." y
     Right (minor, "") <- Just $ decimal z
     return $ LTSVer major minor
+
 renderLTSVer :: LTSVer -> FilePath
 renderLTSVer lts = fpFromText $ concat
     [ "lts-"

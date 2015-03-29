@@ -44,12 +44,12 @@ main =
                   "Build, test and upload the Nightly snapshot"
             , cmnd
                   (uncurry completeBuild)
-                  (fmap (LTS Major, ) buildFlags)
+                  (lts Major)
                   "lts-major"
                   "Build, test and upload the LTS (major) snapshot"
             , cmnd
                   (uncurry completeBuild)
-                  (fmap (LTS Minor, ) buildFlags)
+                  (lts Minor)
                   "lts-minor"
                   "Build, test and upload the LTS (minor) snapshot"
             , cmnd
@@ -208,3 +208,11 @@ main =
                  metavar "SERVER-URL" <>
                  showDefault <> value (T.unpack $ unStackageServer def) <>
                  help "Server to upload bundle to")
+
+    lts bumpType = (\x y -> (y, x)) -- get the order of arguments correct
+        <$> buildFlags
+        <*> (LTS bumpType <$> (T.pack <$> argument str
+                ( metavar "TARGET-VERSION"
+               <> help "Used to run old LTS minor bumps, and rerun broken builds"
+               <> value ""
+                ) ) )

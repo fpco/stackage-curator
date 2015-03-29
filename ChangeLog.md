@@ -1,3 +1,7 @@
+## 0.7.0.3
+
+* LTS bumps: specify a goal
+
 ## 0.7.0.2
 
 * Deal better with invariant violations around unregistered packages
