@@ -94,11 +94,22 @@ nightlySettings day plan' = Settings
   where
     slug' = "nightly-" ++ day
 
-parseGoal :: MonadThrow m => Text -> m (LTSVer -> Bool)
-parseGoal "" = return $ const True
-parseGoal t =
+parseGoal :: MonadThrow m
+          => BumpType
+          -> Text
+          -> m (LTSVer -> Bool)
+parseGoal _ "" = return $ const True
+parseGoal bumpType t =
     case decimal t of
-        Right (major, "") -> return $ \(LTSVer major' _) -> major' <= major
+        Right (major, "") -> return $ \(LTSVer major' _) ->
+            case bumpType of
+                -- For major bumps: specifying 2 means we want to ignore
+                -- anything in the 2.* range
+                Major -> major' < major
+
+                -- But for minor bumps, specifying 2 means we want to include
+                -- everything in 2.*, and start ignore 3.*
+                Minor -> major' <= major
         _ ->
             case parseLTSRaw t of
                 Nothing -> throwM $ ParseGoalFailure t
@@ -116,7 +127,7 @@ getSettings man Nightly = do
     plan' <- newBuildPlan pkgs bc
     return $ nightlySettings day plan'
 getSettings man (LTS bumpType goal) = do
-    matchesGoal <- parseGoal goal
+    matchesGoal <- parseGoal bumpType goal
     Option mlts <- fmap (fmap getMax) $ runResourceT
         $ sourceDirectory "."
        $= concatMapC (parseLTSVer . filename)
