@@ -1,5 +1,5 @@
 name:                stackage-curator
-version:             0.7.0.5
+version:             0.7.1
 synopsis:            Tools for curating Stackage bundles
 description:         Please see <http://www.stackage.org/package/stackage-curator> for a description and documentation.
 homepage:            https://github.com/fpco/stackage
@@ -28,6 +28,7 @@ library
                        Stackage.InstallBuild
                        Stackage.PackageDescription
                        Stackage.ServerBundle
+                       Stackage.Stats
                        Stackage.Upload
                        Stackage.PerformBuild
                        Stackage.CompleteBuild

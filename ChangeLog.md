@@ -1,3 +1,7 @@
+## 0.7.1
+
+* Add the `stats` command
+
 ## 0.7.0.4
 
 * Respect --summary option

@@ -12,6 +12,7 @@ import Paths_stackage_curator (version)
 import Stackage.CompleteBuild
 import Stackage.Upload
 import Stackage.InstallBuild
+import Stackage.Stats
 import Network.HTTP.Client (withManager)
 import Network.HTTP.Client.TLS (tlsManagerSettings)
 import qualified Data.Text as T
@@ -76,6 +77,11 @@ main =
                   uploadv2Flags
                   "upload2"
                   "Upload a pre-existing v2 bundle"
+            , cmnd
+                  printStats
+                  printStatsFlags
+                  "stats"
+                  "Print statistics on a build plan"
             ]
 
     cmnd exec parse name desc =
@@ -220,3 +226,7 @@ main =
                <> help "Used to run old LTS minor bumps, and rerun broken builds"
                <> value ""
                 ) ) )
+
+    printStatsFlags = fmap decodeString $ strArgument
+         $ metavar "YAML-FILE"
+        <> help "YAML file containing a build plan"
