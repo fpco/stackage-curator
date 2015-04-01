@@ -1,3 +1,7 @@
+## 0.7.0.4
+
+* Respect --summary option
+
 ## 0.7.0.3
 
 * LTS bumps: specify a goal

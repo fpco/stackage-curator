@@ -21,7 +21,7 @@ main =
     join $
     execParser $
     info
-        (helpOption <*> versionOption <*> config)
+        (helpOption <*> versionOption <*> summaryOption <*> config)
         (header "Stackage" <>
          fullDesc)
   where
@@ -31,9 +31,13 @@ main =
         help "Show this help text"
     versionOption =
         infoOption
-            ("stackage version " ++ showVersion version)
+            ("stackage-curator version " ++ showVersion version)
             (long "version" <>
              help "Show stackage version")
+    summaryOption =
+        infoOption
+            "Build package sets for Stackage Nightly and LTS Haskell"
+            (long "summary")
     config =
         subparser $
         mconcat
