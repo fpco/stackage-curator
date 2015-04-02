@@ -1,3 +1,7 @@
+## 0.7.1.1
+
+* Fix bug with existing .haddock file collection
+
 ## 0.7.1
 
 * Add the `stats` command

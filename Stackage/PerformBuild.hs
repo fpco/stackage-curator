@@ -195,7 +195,6 @@ performBuild' pb@PerformBuild {..} = withBuildDir $ \builddir -> do
     warningsVar <- newTVarIO id
     mutex <- newMVar ()
     env <- getEnvironment
-    haddockFiles <- newTVarIO mempty
 
     registeredPackages <- setupPackageDatabase
         (pbDatabase pb)
@@ -203,6 +202,9 @@ performBuild' pb@PerformBuild {..} = withBuildDir $ \builddir -> do
         pbLog
         (ppVersion <$> bpPackages pbPlan)
         (deletePreviousResults pb)
+
+    pbLog "Collecting existing .haddock files\n"
+    haddockFiles <- getHaddockFiles pb >>= newTVarIO
 
     forM_ packageMap $ \pi -> void $ async $ singleBuild pb registeredPackages
       SingleBuild
@@ -570,3 +572,23 @@ deletePreviousResults pb name =
     forM_ [minBound..maxBound] $ \rt ->
     withPRPath pb rt name $ \fp ->
     void $ tryIO $ removeFile fp
+
+-- | Discover existing .haddock files in the docs directory
+getHaddockFiles :: PerformBuild -> IO (Map Text FilePath)
+getHaddockFiles pb =
+      runResourceT
+    $ sourceDirectory (pbDocDir pb)
+   $$ foldMapMC (liftIO . go)
+  where
+    go :: FilePath -> IO (Map Text FilePath)
+    go dir =
+        case simpleParse nameVerText of
+            Nothing -> return mempty
+            Just pi@(PackageIdentifier (PackageName name) _) -> do
+                let fp = dir </> fpFromString name <.> "haddock"
+                exists <- isFile fp
+                return $ if exists
+                    then singletonMap nameVerText fp
+                    else mempty
+      where
+        nameVerText = fpToText $ filename dir
