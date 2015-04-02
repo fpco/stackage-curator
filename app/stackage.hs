@@ -10,6 +10,7 @@ import Options.Applicative
 import Filesystem.Path.CurrentOS (decodeString)
 import Paths_stackage_curator (version)
 import Stackage.CompleteBuild
+import Stackage.DiffPlans
 import Stackage.Upload
 import Stackage.InstallBuild
 import Stackage.Stats
@@ -82,6 +83,11 @@ main =
                   printStatsFlags
                   "stats"
                   "Print statistics on a build plan"
+            , cmnd
+                (uncurry diffPlans)
+                diffPlansFlags
+                "diff"
+                "Show the high-level differences between two build plans"
             ]
 
     cmnd exec parse name desc =
@@ -227,6 +233,10 @@ main =
                <> value ""
                 ) ) )
 
-    printStatsFlags = fmap decodeString $ strArgument
+    printStatsFlags = yamlArg
+
+    diffPlansFlags = (,) <$> yamlArg <*> yamlArg
+
+    yamlArg = fmap decodeString $ strArgument
          $ metavar "YAML-FILE"
         <> help "YAML file containing a build plan"

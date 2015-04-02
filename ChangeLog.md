@@ -1,3 +1,7 @@
+## 0.7.2
+
+* Add `diff` command
+
 ## 0.7.1.1
 
 * Fix bug with existing .haddock file collection
