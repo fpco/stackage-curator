@@ -59,11 +59,6 @@ main =
                   "lts-minor"
                   "Build, test and upload the LTS (minor) snapshot"
             , cmnd
-                  justUploadNightly
-                  nightlyUploadFlags
-                  "upload-nightly"
-                  "Upload an already-built nightly snapshot"
-            , cmnd
                   (const justCheck)
                   (pure ())
                   "check"
@@ -74,10 +69,10 @@ main =
                   "install"
                   "Install a snapshot from an existing build plan"
             , cmnd
-                  uploadv2
-                  uploadv2Flags
-                  "upload2"
-                  "Upload a pre-existing v2 bundle"
+                  upload
+                  uploadFlags
+                  "upload"
+                  "Upload a pre-existing bundle"
             , cmnd
                   printStats
                   printStatsFlags
@@ -125,9 +120,6 @@ main =
         switch
             (long "skip-check" <>
              help "Skip the check phase, and pass --allow-newer to cabal configure") <*>
-        switch
-            (long "upload-v1" <>
-             help "Use the V1 upload code") <*>
         (fmap fromString (strOption
             (long "server-url" <>
              metavar "SERVER-URL" <>
@@ -137,11 +129,13 @@ main =
             not
             (switch
                  (long "skip-hoogle" <>
-                  help "Skip generating Hoogle input files"))
-
-    nightlyUploadFlags = fromString <$> strArgument
-        (metavar "DATE" <>
-         help "Date, in YYYY-MM-DD format")
+                  help "Skip generating Hoogle input files")) <*>
+        (fmap (Just . fromString) (strOption
+            (long "bundle-dest" <> metavar "FILENAME"))
+            <|> pure Nothing) <*>
+        (fmap not (switch
+            (long "skip-git-push" <>
+             help "Do not perform a git push after completion (for LTS builds only)")))
 
     installFlags =
         InstallFlags <$>
@@ -206,7 +200,7 @@ main =
                  (long "skip-hoogle" <>
                   help "Skip generating Hoogle input files"))
 
-    uploadv2 (path, url) = withManager tlsManagerSettings $ \man -> do
+    upload (path, url) = withManager tlsManagerSettings $ \man -> do
         token <- getStackageAuthToken
         res <- flip uploadBundleV2 man UploadBundleV2
             { ub2AuthToken = token
@@ -215,7 +209,7 @@ main =
             }
         putStrLn $ "New URL: " ++ T.unpack res
 
-    uploadv2Flags = (,)
+    uploadFlags = (,)
         <$> (strArgument
                 (metavar "BUNDLE-PATH" <>
                  help "Bundle path"))

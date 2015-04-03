@@ -8,7 +8,6 @@ module Stackage.CompleteBuild
     , BuildFlags (..)
     , completeBuild
     , justCheck
-    , justUploadNightly
     , getStackageAuthToken
     ) where
 
@@ -41,9 +40,11 @@ data BuildFlags = BuildFlags
     , bfEnableExecDyn    :: !Bool
     , bfVerbose          :: !Bool
     , bfSkipCheck        :: !Bool
-    , bfUploadV1         :: !Bool
     , bfServer           :: !StackageServer
     , bfBuildHoogle      :: !Bool
+    , bfBundleDest       :: !(Maybe FilePath)
+    , bfGitPush          :: !Bool
+    -- ^ push to Git (when doing an LTS build)
     } deriving (Show)
 
 data BuildType = Nightly | LTS BumpType Text
@@ -71,9 +72,10 @@ nightlyPlanFile :: Text -- ^ day
 nightlyPlanFile day = fpFromText ("nightly-" ++ day) <.> "yaml"
 
 nightlySettings :: Text -- ^ day
+                -> BuildFlags
                 -> BuildPlan
                 -> Settings
-nightlySettings day plan' = Settings
+nightlySettings day bf plan' = Settings
     { planFile = nightlyPlanFile day
     , buildDir = fpFromText $ "builds/nightly"
     , logDir = fpFromText $ "logs/stackage-nightly-" ++ day
@@ -89,7 +91,9 @@ nightlySettings day plan' = Settings
     , postBuild = return ()
     , distroName = "Stackage"
     , snapshotType = STNightly
-    , bundleDest = fpFromText $ "stackage-nightly-" ++ day ++ ".bundle"
+    , bundleDest = fromMaybe
+        (fpFromText $ "stackage-nightly-" ++ day ++ ".bundle")
+        (bfBundleDest bf)
     }
   where
     slug' = "nightly-" ++ day
@@ -119,14 +123,14 @@ data ParseGoalFailure = ParseGoalFailure Text
     deriving (Show, Typeable)
 instance Exception ParseGoalFailure
 
-getSettings :: Manager -> BuildType -> IO Settings
-getSettings man Nightly = do
+getSettings :: Manager -> BuildFlags -> BuildType -> IO Settings
+getSettings man bf Nightly = do
     day <- tshow . utctDay <$> getCurrentTime
     bc <- defaultBuildConstraints man
     pkgs <- getLatestAllowedPlans bc
     plan' <- newBuildPlan pkgs bc
-    return $ nightlySettings day plan'
-getSettings man (LTS bumpType goal) = do
+    return $ nightlySettings day bf plan'
+getSettings man bf (LTS bumpType goal) = do
     matchesGoal <- parseGoal bumpType goal
     Option mlts <- fmap (fmap getMax) $ runResourceT
         $ sourceDirectory "."
@@ -176,13 +180,16 @@ getSettings man (LTS bumpType goal) = do
             putStrLn "Committing new LTS file to Git"
             git ["add", fpToString newfile]
             git ["commit", "-m", "Added new LTS release: " ++ show new]
-            putStrLn "Pushing to Git repository"
-            git ["push"]
+            when (bfGitPush bf) $ do
+                putStrLn "Pushing to Git repository"
+                git ["push"]
         , distroName = "LTSHaskell"
         , snapshotType =
             case new of
                 LTSVer x y -> STLTS x y
-        , bundleDest = fpFromText $ "stackage-lts-" ++ tshow new ++ ".bundle"
+        , bundleDest = fromMaybe
+            (fpFromText $ "stackage-lts-" ++ tshow new ++ ".bundle")
+            (bfBundleDest bf)
         }
 
 data LTSVer = LTSVer !Int !Int
@@ -268,7 +275,7 @@ completeBuild buildType buildFlags = withManager tlsManagerSettings $ \man -> do
     hSetBuffering stdout LineBuffering
 
     putStrLn $ "Loading settings for: " ++ tshow buildType
-    settings@Settings {..} <- getSettings man buildType
+    settings@Settings {..} <- getSettings man buildFlags buildType
 
     putStrLn $ "Writing build plan to: " ++ fpToText planFile
     encodeFile (fpToString planFile) plan
@@ -291,20 +298,13 @@ completeBuild buildType buildFlags = withManager tlsManagerSettings $ \man -> do
         , cb2Dest = bundleDest
         }
 
+    postBuild `catchAny` print
+
     when (bfDoUpload buildFlags) $
         finallyUpload
-            (not $ bfUploadV1 buildFlags)
-            (bfServer buildFlags)
+            buildFlags
             settings
             man
-
-justUploadNightly
-    :: Text -- ^ nightly date
-    -> IO ()
-justUploadNightly day = do
-    plan <- decodeFileEither (fpToString $ nightlyPlanFile day)
-        >>= either throwM return
-    withManager tlsManagerSettings $ finallyUpload False def $ nightlySettings day plan
 
 getStackageAuthToken :: IO Text
 getStackageAuthToken = do
@@ -315,54 +315,22 @@ getStackageAuthToken = do
 
 -- | The final part of the complete build process: uploading a bundle,
 -- docs and a distro to hackage.
-finallyUpload :: Bool -- ^ use v2 upload
-              -> StackageServer
+finallyUpload :: BuildFlags
               -> Settings -> Manager -> IO ()
-finallyUpload useV2 server settings@Settings{..} man = do
-    pb <- getPerformBuild (error "finallyUpload.buildFlags") settings
+finallyUpload buildFlags settings@Settings{..} man = do
+    let server = bfServer buildFlags
+    pb <- getPerformBuild buildFlags settings
 
     putStrLn "Uploading bundle to Stackage Server"
 
     token <- getStackageAuthToken
 
-    if useV2
-        then do
-            res <- flip uploadBundleV2 man UploadBundleV2
-                { ub2Server = server
-                , ub2AuthToken = token
-                , ub2Bundle = bundleDest
-                }
-            putStrLn $ "New snapshot available at: " ++ res
-        else do
-            now <- epochTime
-            let ghcVer = display $ siGhcVersion $ bpSystemInfo plan
-            (ident, mloc) <- flip uploadBundle man $ setArgs ghcVer def
-                { ubContents = serverBundle now (title ghcVer) slug plan
-                , ubAuthToken = token
-                }
-            putStrLn $ "New ident: " ++ unSnapshotIdent ident
-            forM_ mloc $ \loc ->
-                putStrLn $ "Track progress at: " ++ loc
-
-            putStrLn "Uploading docs to Stackage Server"
-            res1 <- tryAny $ uploadDocs UploadDocs
-                { udServer = def
-                , udAuthToken = token
-                , udDocs = pbDocDir pb
-                , udSnapshot = ident
-                } man
-            putStrLn $ "Doc upload response: " ++ tshow res1
-
-            putStrLn "Uploading doc map"
-            tryAny (uploadDocMap UploadDocMap
-                { udmServer = def
-                , udmAuthToken = token
-                , udmSnapshot = ident
-                , udmDocDir = pbDocDir pb
-                , udmPlan = plan
-                } man) >>= print
-
-    postBuild `catchAny` print
+    res <- flip uploadBundleV2 man UploadBundleV2
+        { ub2Server = server
+        , ub2AuthToken = token
+        , ub2Bundle = bundleDest
+        }
+    putStrLn $ "New snapshot available at: " ++ res
 
     ecreds <- tryIO $ readFile "/hackage-creds"
     case map encodeUtf8 $ words $ decodeUtf8 $ either (const "") id ecreds of

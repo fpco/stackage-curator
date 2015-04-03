@@ -1,6 +1,9 @@
-## 0.7.2.1
+## 0.7.3
 
 * Number of jobs == number of capabilities
+* `--bundle-dest`
+* `--skip-git-push`
+* Removed some of the old upload stuff
 
 ## 0.7.2
 
