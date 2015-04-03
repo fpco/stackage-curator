@@ -12,7 +12,7 @@ module Stackage.CompleteBuild
     , getStackageAuthToken
     ) where
 
-import Control.Concurrent        (threadDelay)
+import Control.Concurrent        (threadDelay, getNumCapabilities)
 import Control.Concurrent.Async  (withAsync)
 import Data.Default.Class        (def)
 import Data.Semigroup            (Max (..), Option (..))
@@ -242,22 +242,24 @@ justCheck = stillAlive $ withManager tlsManagerSettings $ \man -> do
 
     putStrLn "Plan seems valid!"
 
-getPerformBuild :: BuildFlags -> Settings -> PerformBuild
-getPerformBuild buildFlags Settings {..} = PerformBuild
-    { pbPlan = plan
-    , pbInstallDest = buildDir
-    , pbLogDir = logDir
-    , pbLog = hPut stdout
-    , pbJobs = 8
-    , pbGlobalInstall = False
-    , pbEnableTests = bfEnableTests buildFlags
-    , pbEnableHaddock = bfEnableHaddock buildFlags
-    , pbEnableLibProfiling = bfEnableLibProfile buildFlags
-    , pbEnableExecDyn = bfEnableExecDyn buildFlags
-    , pbVerbose = bfVerbose buildFlags
-    , pbAllowNewer = bfSkipCheck buildFlags
-    , pbBuildHoogle = bfBuildHoogle buildFlags
-    }
+getPerformBuild :: BuildFlags -> Settings -> IO PerformBuild
+getPerformBuild buildFlags Settings {..} = do
+    jobs <- getNumCapabilities
+    return PerformBuild
+        { pbPlan = plan
+        , pbInstallDest = buildDir
+        , pbLogDir = logDir
+        , pbLog = hPut stdout
+        , pbJobs = jobs
+        , pbGlobalInstall = False
+        , pbEnableTests = bfEnableTests buildFlags
+        , pbEnableHaddock = bfEnableHaddock buildFlags
+        , pbEnableLibProfiling = bfEnableLibProfile buildFlags
+        , pbEnableExecDyn = bfEnableExecDyn buildFlags
+        , pbVerbose = bfVerbose buildFlags
+        , pbAllowNewer = bfSkipCheck buildFlags
+        , pbBuildHoogle = bfBuildHoogle buildFlags
+        }
 
 -- | Make a complete plan, build, test and upload bundle, docs and
 -- distro.
@@ -278,7 +280,7 @@ completeBuild buildType buildFlags = withManager tlsManagerSettings $ \man -> do
             checkBuildPlan plan
 
     putStrLn "Performing build"
-    let pb = getPerformBuild buildFlags settings
+    pb <- getPerformBuild buildFlags settings
     performBuild pb >>= mapM_ putStrLn
 
     putStrLn $ "Creating bundle (v2) at: " ++ fpToText bundleDest
@@ -317,6 +319,8 @@ finallyUpload :: Bool -- ^ use v2 upload
               -> StackageServer
               -> Settings -> Manager -> IO ()
 finallyUpload useV2 server settings@Settings{..} man = do
+    pb <- getPerformBuild (error "finallyUpload.buildFlags") settings
+
     putStrLn "Uploading bundle to Stackage Server"
 
     token <- getStackageAuthToken
@@ -367,5 +371,3 @@ finallyUpload useV2 server settings@Settings{..} man = do
             res2 <- uploadHackageDistroNamed distroName plan username password man
             putStrLn $ "Distro upload response: " ++ tshow res2
         _ -> putStrLn "No creds found, skipping Hackage distro upload"
-  where
-    pb = getPerformBuild (error "finallyUpload.buildFlags") settings

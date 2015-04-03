@@ -1,3 +1,7 @@
+## 0.7.2.1
+
+* Number of jobs == number of capabilities
+
 ## 0.7.2
 
 * Add `diff` command
