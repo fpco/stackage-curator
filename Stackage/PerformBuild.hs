@@ -502,7 +502,7 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} =
         log' $ concat
             [ display (piName sbPackageInfo)
             , ": "
-            , tshow exc
+            , take 500 $ tshow exc
             ]
         atomically $ modifyTVar sbErrsVar $ insertMap (piName sbPackageInfo) exc'
       where
