@@ -4,6 +4,7 @@
 * `--bundle-dest`
 * `--skip-git-push`
 * Removed some of the old upload stuff
+* Better exception output (limited to 500 characters)
 
 ## 0.7.2
 

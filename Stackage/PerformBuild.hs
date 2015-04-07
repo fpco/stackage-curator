@@ -43,7 +43,7 @@ instance Show BuildException where
         go (PackageName name, bf) = concat
             [ name
             , ": "
-            , show bf
+            , take 500 $ show bf
             ]
 
 data BuildFailure = DependencyFailed PackageName
