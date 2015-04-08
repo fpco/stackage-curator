@@ -1,3 +1,7 @@
+## 0.8.0
+
+* Restructured commands to work on server/Docker setup
+
 ## 0.7.4
 
 * `-j`/`--jobs` option for build flags

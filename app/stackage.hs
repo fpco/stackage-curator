@@ -140,7 +140,16 @@ main =
             auto
             (long "jobs" <> short 'j' <>
              metavar "NUMBER" <>
-             help "Number of threads")) <|> pure Nothing)
+             help "Number of threads")) <|> pure Nothing) <*>
+        (fmap (Just . fromString) (strOption
+            (long "plan-file" <> metavar "FILENAME"))
+            <|> pure Nothing) <*>
+        (switch
+            (long "pre-build" <>
+             help "Only perform operations up until the actual build")) <*>
+        (switch
+            (long "load-plan" <>
+             help "Load plan from file"))
 
     installFlags =
         InstallFlags <$>

@@ -7,6 +7,7 @@
 {-# LANGUAGE RecordWildCards    #-}
 module Stackage.PerformBuild
     ( performBuild
+    , prefetchPackages
     , PerformBuild (..)
     , BuildException (..)
     , pbDocDir
@@ -152,10 +153,8 @@ performBuild pb = do
         , pbLogDir = cwd </> pbLogDir pb
         }
 
-performBuild' :: PerformBuild -> IO [Text]
-performBuild' pb@PerformBuild {..} = withBuildDir $ \builddir -> do
-    -- First make sure to fetch all of the dependencies... just in case Hackage
-    -- has an outage. Don't feel like wasting hours of CPU time.
+prefetchPackages :: PerformBuild -> IO ()
+prefetchPackages PerformBuild {..} = do
     pbLog $ encodeUtf8 "Pre-fetching all packages\n"
     let toDownload = flip map (mapToList $ bpPackages pbPlan)
             $ \(name, plan) -> unpack $ concat
@@ -169,6 +168,12 @@ performBuild' pb@PerformBuild {..} = withBuildDir $ \builddir -> do
             : "--no-dependencies"
             : toDownload)
         $ \ClosedStream Inherited Inherited -> return ()
+
+performBuild' :: PerformBuild -> IO [Text]
+performBuild' pb@PerformBuild {..} = withBuildDir $ \builddir -> do
+    -- First make sure to fetch all of the dependencies... just in case Hackage
+    -- has an outage. Don't feel like wasting hours of CPU time.
+    prefetchPackages pb
 
     let removeTree' fp = whenM (isDirectory fp) (removeTree fp)
     removeTree' pbLogDir

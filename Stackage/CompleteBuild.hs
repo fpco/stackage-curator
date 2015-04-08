@@ -46,6 +46,9 @@ data BuildFlags = BuildFlags
     , bfGitPush          :: !Bool
     -- ^ push to Git (when doing an LTS build)
     , bfJobs             :: !(Maybe Int)
+    , bfPlanFile         :: !(Maybe FilePath)
+    , bfPreBuild         :: !Bool
+    , bfLoadPlan         :: !Bool
     } deriving (Show)
 
 data BuildType = Nightly | LTS BumpType Text
@@ -77,7 +80,7 @@ nightlySettings :: Text -- ^ day
                 -> BuildPlan
                 -> Settings
 nightlySettings day bf plan' = Settings
-    { planFile = nightlyPlanFile day
+    { planFile = fromMaybe (nightlyPlanFile day) (bfPlanFile bf)
     , buildDir = fpFromText $ "builds/nightly"
     , logDir = fpFromText $ "logs/stackage-nightly-" ++ day
     , title = \ghcVer -> concat
@@ -124,14 +127,17 @@ data ParseGoalFailure = ParseGoalFailure Text
     deriving (Show, Typeable)
 instance Exception ParseGoalFailure
 
-getSettings :: Manager -> BuildFlags -> BuildType -> IO Settings
-getSettings man bf Nightly = do
+getSettings :: Manager -> BuildFlags -> BuildType -> Maybe FilePath -> IO Settings
+getSettings man bf Nightly mplanFile = do
     day <- tshow . utctDay <$> getCurrentTime
-    bc <- defaultBuildConstraints man
-    pkgs <- getLatestAllowedPlans bc
-    plan' <- newBuildPlan pkgs bc
+    plan' <- case mplanFile of
+        Nothing -> do
+            bc <- defaultBuildConstraints man
+            pkgs <- getLatestAllowedPlans bc
+            newBuildPlan pkgs bc
+        Just file -> decodeFileEither (fpToString file) >>= either throwIO return
     return $ nightlySettings day bf plan'
-getSettings man bf (LTS bumpType goal) = do
+getSettings man bf (LTS bumpType goal) Nothing = do
     matchesGoal <- parseGoal bumpType goal
     Option mlts <- fmap (fmap getMax) $ runResourceT
         $ sourceDirectory "."
@@ -162,7 +168,7 @@ getSettings man bf (LTS bumpType goal) = do
     let newfile = renderLTSVer new
 
     return Settings
-        { planFile = newfile
+        { planFile = fromMaybe newfile (bfPlanFile bf)
         , buildDir = fpFromText $ "builds/lts"
         , logDir = fpFromText $ "logs/stackage-lts-" ++ tshow new
         , title = \ghcVer -> concat
@@ -275,37 +281,51 @@ completeBuild :: BuildType -> BuildFlags -> IO ()
 completeBuild buildType buildFlags = withManager tlsManagerSettings $ \man -> do
     hSetBuffering stdout LineBuffering
 
-    putStrLn $ "Loading settings for: " ++ tshow buildType
-    settings@Settings {..} <- getSettings man buildFlags buildType
-
-    putStrLn $ "Writing build plan to: " ++ fpToText planFile
-    encodeFile (fpToString planFile) plan
-
-    if bfSkipCheck buildFlags
-        then putStrLn "Skipping build plan check"
+    settings@Settings {..} <- if bfLoadPlan buildFlags
+        then
+            case bfPlanFile buildFlags of
+                Nothing -> error "When loading plan, plan file must be specified"
+                Just file -> do
+                    putStrLn $ "Loading build plan from: " ++ fpToText file
+                    getSettings man buildFlags buildType $ Just file
         else do
-            putStrLn "Checking build plan"
-            checkBuildPlan plan
+            putStrLn $ "Loading settings for: " ++ tshow buildType
+            settings@Settings {..} <- getSettings man buildFlags buildType Nothing
 
-    putStrLn "Performing build"
+            putStrLn $ "Writing build plan to: " ++ fpToText planFile
+            encodeFile (fpToString planFile) plan
+
+            if bfSkipCheck buildFlags
+                then putStrLn "Skipping build plan check"
+                else do
+                    putStrLn "Checking build plan"
+                    checkBuildPlan plan
+
+            return settings
+
     pb <- getPerformBuild buildFlags settings
-    performBuild pb >>= mapM_ putStrLn
 
-    putStrLn $ "Creating bundle (v2) at: " ++ fpToText bundleDest
-    createBundleV2 CreateBundleV2
-        { cb2Plan = plan
-        , cb2Type = snapshotType
-        , cb2DocsDir = pbDocDir pb
-        , cb2Dest = bundleDest
-        }
+    if bfPreBuild buildFlags
+        then prefetchPackages pb
+        else do
+            putStrLn "Performing build"
+            performBuild pb >>= mapM_ putStrLn
 
-    postBuild `catchAny` print
+            putStrLn $ "Creating bundle (v2) at: " ++ fpToText bundleDest
+            createBundleV2 CreateBundleV2
+                { cb2Plan = plan
+                , cb2Type = snapshotType
+                , cb2DocsDir = pbDocDir pb
+                , cb2Dest = bundleDest
+                }
 
-    when (bfDoUpload buildFlags) $
-        finallyUpload
-            buildFlags
-            settings
-            man
+            postBuild `catchAny` print
+
+            when (bfDoUpload buildFlags) $
+                finallyUpload
+                    buildFlags
+                    settings
+                    man
 
 getStackageAuthToken :: IO Text
 getStackageAuthToken = do
