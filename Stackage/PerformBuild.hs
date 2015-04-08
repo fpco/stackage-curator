@@ -15,7 +15,6 @@ module Stackage.PerformBuild
 import           Control.Concurrent.Async    (async)
 import           Control.Concurrent.STM.TSem
 import           Control.Monad.Writer.Strict (execWriter, tell)
-import           Control.Monad.State.Strict  (evalStateT, StateT, get, put)
 import qualified Data.Map                    as Map
 import           Data.NonNull                (fromNullable)
 import           Filesystem                  (canonicalizePath, createTree,
@@ -610,27 +609,24 @@ getHaddockDeps :: BuildPlan
                -> TVar (Map PackageName (Set PackageName))
                -> PackageName
                -> STM (Set PackageName)
-getHaddockDeps BuildPlan {..} var name0 =
-    -- StateT tracks the visited packages so we don't get into an infinite loop
-    evalStateT (go name0) mempty
+getHaddockDeps BuildPlan {..} var =
+    go
   where
-    checkVisited name inner = do
-        visited <- get
-        if name `member` visited
-            then return mempty
-            else do
-                put $ insertSet name visited
-                inner
-
-    go :: PackageName -> StateT (Set PackageName) STM (Set PackageName)
+    go :: PackageName -> STM (Set PackageName)
     go name = do
-        m <- lift $ readTVar var
+        m <- readTVar var
         case lookup name m of
             Just res -> return res
-            Nothing -> checkVisited name $ do
+            Nothing -> do
+                -- First thing we do is put in a dummy value in the var for
+                -- this package, to avoid the possibility of an infinite loop
+                -- due to packages depending on themselves (which is in fact
+                -- valid).
+                modifyTVar var $ insertMap name mempty
+
                 res' <- fmap fold $ mapM go $ setToList deps
                 let res = deps ++ res'
-                lift $ modifyTVar var $ insertMap name res
+                modifyTVar var $ insertMap name res
                 return res
       where
         deps =
