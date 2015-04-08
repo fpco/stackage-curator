@@ -45,6 +45,7 @@ data BuildFlags = BuildFlags
     , bfBundleDest       :: !(Maybe FilePath)
     , bfGitPush          :: !Bool
     -- ^ push to Git (when doing an LTS build)
+    , bfJobs             :: !(Maybe Int)
     } deriving (Show)
 
 data BuildType = Nightly | LTS BumpType Text
@@ -251,7 +252,7 @@ justCheck = stillAlive $ withManager tlsManagerSettings $ \man -> do
 
 getPerformBuild :: BuildFlags -> Settings -> IO PerformBuild
 getPerformBuild buildFlags Settings {..} = do
-    jobs <- getNumCapabilities
+    jobs <- maybe getNumCapabilities return $ bfJobs buildFlags
     return PerformBuild
         { pbPlan = plan
         , pbInstallDest = buildDir

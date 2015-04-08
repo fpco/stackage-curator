@@ -1,3 +1,7 @@
+## 0.7.4
+
+* `-j`/`--jobs` option for build flags
+
 ## 0.7.3
 
 * Number of jobs == number of capabilities

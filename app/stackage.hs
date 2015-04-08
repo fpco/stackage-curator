@@ -135,7 +135,12 @@ main =
             <|> pure Nothing) <*>
         (fmap not (switch
             (long "skip-git-push" <>
-             help "Do not perform a git push after completion (for LTS builds only)")))
+             help "Do not perform a git push after completion (for LTS builds only)"))) <*>
+        (fmap Just (option
+            auto
+            (long "jobs" <> short 'j' <>
+             metavar "NUMBER" <>
+             help "Number of threads")) <|> pure Nothing)
 
     installFlags =
         InstallFlags <$>
