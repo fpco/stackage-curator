@@ -1,6 +1,7 @@
 ## 0.7.4
 
 * `-j`/`--jobs` option for build flags
+* Only pass in required .haddock files (more memory efficiency)
 
 ## 0.7.3
 

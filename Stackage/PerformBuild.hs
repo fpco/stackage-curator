@@ -15,6 +15,7 @@ module Stackage.PerformBuild
 import           Control.Concurrent.Async    (async)
 import           Control.Concurrent.STM.TSem
 import           Control.Monad.Writer.Strict (execWriter, tell)
+import           Control.Monad.State.Strict  (evalStateT, StateT, get, put)
 import qualified Data.Map                    as Map
 import           Data.NonNull                (fromNullable)
 import           Filesystem                  (canonicalizePath, createTree,
@@ -205,6 +206,7 @@ performBuild' pb@PerformBuild {..} = withBuildDir $ \builddir -> do
 
     pbLog "Collecting existing .haddock files\n"
     haddockFiles <- getHaddockFiles pb >>= newTVarIO
+    haddockDeps <- newTVarIO mempty
 
     forM_ packageMap $ \pi -> void $ async $ singleBuild pb registeredPackages
       SingleBuild
@@ -223,6 +225,7 @@ performBuild' pb@PerformBuild {..} = withBuildDir $ \builddir -> do
             (pbDatabase pb)
             (filter allowedEnv $ map fixEnv env)
         , sbHaddockFiles = haddockFiles
+        , sbHaddockDeps = haddockDeps
         }
 
     void $ tryAny $ atomically $ readTVar active >>= checkSTM . (== 0)
@@ -267,6 +270,8 @@ data SingleBuild = SingleBuild
     , sbRegisterMutex :: MVar ()
     , sbModifiedEnv   :: [(String, String)]
     , sbHaddockFiles  :: TVar (Map Text FilePath) -- ^ package-version, .haddock file
+    , sbHaddockDeps   :: TVar (Map PackageName (Set PackageName))
+    -- ^ Deep deps of library and executables
     }
 
 singleBuild :: PerformBuild
@@ -432,7 +437,15 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} =
         when needHaddock $ withConfiged $ do
             log' $ "Haddocks " ++ namever
             hfs <- readTVarIO sbHaddockFiles
-            let hfsOpts = flip map (mapToList hfs) $ \(pkgVer, hf) -> concat
+            haddockDeps <- atomically $ getHaddockDeps pbPlan sbHaddockDeps pname
+            let hfsOpts = map hfOpt
+                        $ filter ((`member` haddockDeps) . toPackageName . fst)
+                        $ mapToList hfs
+                toPackageName t =
+                    case simpleParse t of
+                        Just (PackageIdentifier x _) -> x
+                        Nothing -> error $ "Invalid package identifier: " ++ unpack t
+                hfOpt (pkgVer, hf) = concat
                     [ "--haddock-options=--read-interface="
                     , "../"
                     , pkgVer
@@ -592,3 +605,45 @@ getHaddockFiles pb =
                     else mempty
       where
         nameVerText = fpToText $ filename dir
+
+getHaddockDeps :: BuildPlan
+               -> TVar (Map PackageName (Set PackageName))
+               -> PackageName
+               -> STM (Set PackageName)
+getHaddockDeps BuildPlan {..} var name0 =
+    -- StateT tracks the visited packages so we don't get into an infinite loop
+    evalStateT (go name0) mempty
+  where
+    checkVisited name inner = do
+        visited <- get
+        if name `member` visited
+            then return mempty
+            else do
+                put $ insertSet name visited
+                inner
+
+    go :: PackageName -> StateT (Set PackageName) STM (Set PackageName)
+    go name = do
+        m <- lift $ readTVar var
+        case lookup name m of
+            Just res -> return res
+            Nothing -> checkVisited name $ do
+                res' <- fmap fold $ mapM go $ setToList deps
+                let res = deps ++ res'
+                lift $ modifyTVar var $ insertMap name res
+                return res
+      where
+        deps =
+            case lookup name bpPackages of
+                Nothing -> mempty
+                Just PackagePlan {..} ->
+                    asSet
+                  $ setFromList
+                  $ map fst
+                  $ filter (isLibExe . snd)
+                  $ mapToList
+                  $ sdPackages ppDesc
+
+    isLibExe DepInfo {..} =
+        CompLibrary    `member` diComponents ||
+        CompExecutable `member` diComponents
