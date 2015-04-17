@@ -38,7 +38,7 @@ import qualified Data.Yaml as Y
 newtype StackageServer = StackageServer { unStackageServer :: Text }
     deriving (Show, Eq, Ord, Hashable, IsString)
 instance Default StackageServer where
-    def = "http://www.stackage.org"
+    def = "https://www.stackage.org"
 
 data UploadBundle = UploadBundle
     { ubServer    :: StackageServer
@@ -184,7 +184,7 @@ uploadHackageDistroNamed name bp username password manager = do
         (toBuilder $ display name) ++
         "\",\"" ++
         (toBuilder $ display version) ++
-        "\",\"http://www.stackage.org/package/" ++
+        "\",\"https://www.stackage.org/package/" ++
         (toBuilder $ display name) ++
         "\""
 

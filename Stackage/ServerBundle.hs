@@ -174,13 +174,13 @@ mkIndex msnapid dirs = concat
     [ "<!DOCTYPE html>\n<html lang='en'><head><title>Haddocks index</title>"
     , "<link rel='stylesheet' href='https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css'>"
     , "<link rel='stylesheet' href='style.css'>"
-    , "<link rel='shortcut icon' href='http://www.stackage.org/static/img/favicon.ico' />"
+    , "<link rel='shortcut icon' href='https://www.stackage.org/static/img/favicon.ico' />"
     , "</head>"
     , "<body><div class='container'>"
     , "<div class='row'><div class='span12 col-md-12'>"
     , "<h1>Haddock documentation index</h1>"
     , flip foldMap msnapid $ \snapid -> concat
-        [ "<p class='return'><a href=\"http://www.stackage.org/stackage/"
+        [ "<p class='return'><a href=\"https://www.stackage.org/stackage/"
         , snapid
         , "\">Return to snapshot</a></p>"
         ]
