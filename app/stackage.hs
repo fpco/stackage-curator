@@ -45,15 +45,30 @@ main = do
             (checkPlan <$> (fmap Just planFile <|> pure Nothing))
         addCommand "fetch" "Fetch all tarballs needed by a plan" id
             (fetch <$> planFile)
+        addCommand "make-bundle" "Run a complete build and generate an upload bundle" id
+            makeBundle'
+        addCommand "upload" "Upload a bundle to Stackage Server" id
+            (upload <$> bundleFile <*> stackageServer)
 {-
-* `make-bundle`: Make an upload bundle from a plan
-* `upload`: Upload a bundle to stackage.org
 * `hackage-distro`: Update the Hackage distro list
 * `upload-github`: Upload a plan to the relevant Github repo
 * `install`: Install a snapshot from an existing build plan
 * `stats`: Print statistics on a build plan
 * `diff`: Show the high-level differences between two build plans
 -}
+
+    makeBundle' = makeBundle
+        <$> planFile
+        <*> bundleFile
+        <*> target
+        <*> jobs
+        <*> skipTests
+        <*> skipHaddock
+        <*> skipHoogle
+        <*> enableLibraryProfiling
+        <*> enableExecutableDynamic
+        <*> verbose
+        <*> allowNewer
 
 
     {-
@@ -129,12 +144,6 @@ main = do
             (long "enable-library-profiling" <>
              help "Enable profiling when building") <*>
         switch
-            (long "enable-executable-dynamic" <>
-             help "Enable dynamic executables when building") <*>
-        switch
-            (long "verbose" <> short 'v' <>
-             help "Output verbose detail about the build steps") <*>
-        switch
             (long "skip-check" <>
              help "Skip the check phase, and pass --allow-newer to cabal configure") <*>
         (fmap fromString (strOption
@@ -153,11 +162,6 @@ main = do
         (fmap not (switch
             (long "skip-git-push" <>
              help "Do not perform a git push after completion (for LTS builds only)"))) <*>
-        (fmap Just (option
-            auto
-            (long "jobs" <> short 'j' <>
-             metavar "NUMBER" <>
-             help "Number of threads")) <|> pure Nothing) <*>
         (fmap (Just . fromString) (strOption
             (long "plan-file" <> metavar "FILENAME"))
             <|> pure Nothing) <*>
@@ -203,11 +207,6 @@ main = do
         switch
             (long "global" <>
              help "Install in global package database") <*>
-        fmap
-            not
-            (switch
-                (long "skip-tests" <>
-                 help "Skip build and running the test suites")) <*>
         fmap
             not
             (switch
@@ -263,6 +262,48 @@ main = do
     diffPlansFlags = (,) <$> yamlArg <*> yamlArg
     -}
 
+    jobs =
+        (fmap Just (option
+            auto
+            (long "jobs" ++ short 'j' ++
+             metavar "NUMBER" ++
+             help "Number of threads")) <|> pure Nothing)
+
+    skipTests =
+        switch
+            (long "skip-tests" ++
+             help "Skip build and running the test suites")
+
+    skipHaddock =
+        switch
+            (long "skip-haddock" ++
+             help "Skip generating haddock documentation")
+
+    skipHoogle =
+        switch
+            (long "skip-hoogle" ++
+             help "Skip generating Hoogle input files")
+
+    enableLibraryProfiling =
+        switch
+            (long "enable-library-profiling" ++
+             help "Enable profiling when building")
+
+    enableExecutableDynamic =
+        switch
+            (long "enable-executable-dynamic" ++
+             help "Enable dynamic executables when building")
+
+    verbose =
+        switch
+            (long "verbose" ++ short 'v' ++
+             help "Output verbose detail about the build steps")
+
+    allowNewer =
+        switch
+            (long "allow-newer" ++
+             help "Pass --allow-newer to cabal configure (useful when skipping checks)")
+
     target :: Parser Target
     target = option readTarget
         ( metavar "TARGET"
@@ -294,3 +335,16 @@ main = do
         ++ long "plan-file"
         ++ help "YAML file containing a build plan"
          )
+
+    bundleFile = fmap decodeString $ strOption
+         ( metavar "BUNDLE-FILE"
+        ++ long "bundle-file"
+        ++ help "Path to bundle file"
+         )
+
+    stackageServer =
+        (fmap fromString (strOption
+            (long "server-url" ++
+             metavar "SERVER-URL" ++
+             showDefault ++ value (T.unpack $ unStackageServer def) ++
+             help "Server to upload bundle to")))

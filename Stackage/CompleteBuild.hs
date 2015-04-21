@@ -10,6 +10,8 @@ module Stackage.CompleteBuild
     , getStackageAuthToken
     , createPlan
     , fetch
+    , makeBundle
+    , upload
     ) where
 
 import Control.Concurrent        (threadDelay, getNumCapabilities)
@@ -373,6 +375,7 @@ getStackageAuthToken = do
         Nothing -> decodeUtf8 <$> readFile "/auth-token"
         Just token -> return $ pack token
 
+{- FIXME remove
 -- | The final part of the complete build process: uploading a bundle,
 -- docs and a distro to hackage.
 finallyUpload :: BuildFlags
@@ -399,3 +402,78 @@ finallyUpload buildFlags settings@Settings{..} man = do
             res2 <- uploadHackageDistro distroName plan username password man
             putStrLn $ "Distro upload response: " ++ tshow res2
         _ -> putStrLn "No creds found, skipping Hackage distro upload"
+-}
+
+upload
+    :: FilePath -- ^ bundle file
+    -> StackageServer -- ^ server URL
+    -> IO ()
+upload bundleFile server = withManager tlsManagerSettings $ \man -> do
+    putStrLn "Uploading bundle to Stackage Server"
+
+    token <- getStackageAuthToken
+
+    res <- flip uploadBundleV2 man UploadBundleV2
+        { ub2Server = server
+        , ub2AuthToken = token
+        , ub2Bundle = bundleFile
+        }
+    putStrLn $ "New snapshot available at: " ++ res
+
+makeBundle
+    :: FilePath -- ^ plan file
+    -> FilePath -- ^ bundle file
+    -> Target
+    -> Maybe Int -- ^ jobs
+    -> Bool -- ^ skip tests?
+    -> Bool -- ^ skip haddock?
+    -> Bool -- ^ skip hoogle?
+    -> Bool -- ^ enable library profiling?
+    -> Bool -- ^ enable executable dynamic?
+    -> Bool -- ^ verbose?
+    -> Bool -- ^ allow-newer?
+    -> IO ()
+makeBundle
+  planFile bundleFile target mjobs skipTests skipHaddocks skipHoogle
+  enableLibraryProfiling enableExecutableDynamic verbose allowNewer
+        = do
+    plan <- decodeFileEither (fpToString planFile) >>= either throwM return
+    jobs <- maybe getNumCapabilities return mjobs
+    let pb = PerformBuild
+            { pbPlan = plan
+            , pbInstallDest =
+                case target of
+                    TargetNightly -> "builds/nightly"
+                    TargetMajor x -> fpFromText $ "builds/lts-" ++ tshow x
+                    TargetMinor x _ -> fpFromText $ "builds/lts-" ++ tshow x
+            , pbLog = hPut stdout
+            , pbLogDir =
+                case target of
+                    TargetNightly -> "logs/nightly"
+                    TargetMajor x -> fpFromText $ "logs/lts-" ++ tshow x
+                    TargetMinor x _ -> fpFromText $ "logs/lts-" ++ tshow x
+            , pbJobs = jobs
+            , pbGlobalInstall = False
+            , pbEnableTests = not skipTests
+            , pbEnableHaddock = not skipHaddocks
+            , pbEnableLibProfiling = enableLibraryProfiling
+            , pbEnableExecDyn = enableExecutableDynamic
+            , pbVerbose = verbose
+            , pbAllowNewer = allowNewer
+            , pbBuildHoogle = not skipHoogle
+            }
+
+    putStrLn "Performing build"
+    performBuild pb >>= mapM_ putStrLn
+
+    putStrLn $ "Creating bundle (v2) at: " ++ fpToText bundleFile
+    createBundleV2 CreateBundleV2
+        { cb2Plan = plan
+        , cb2Type =
+            case target of
+                TargetNightly -> STNightly
+                TargetMajor x -> STLTS x 0
+                TargetMinor x y -> STLTS x y
+        , cb2DocsDir = pbDocDir pb
+        , cb2Dest = bundleFile
+        }
