@@ -64,7 +64,6 @@ data Settings = Settings
     , logDir    :: FilePath
     , title     :: Text -> Text -- ^ GHC version -> title
     , slug      :: Text
-    , setArgs   :: Text -> UploadBundle -> UploadBundle
     , postBuild :: IO ()
     , distroName :: Text -- ^ distro name on Hackage
     , snapshotType :: SnapshotType
@@ -90,7 +89,6 @@ nightlySettings day bf plan' = Settings
         , ghcVer
         ]
     , slug = slug'
-    , setArgs = \ghcVer ub -> ub { ubNightly = Just ghcVer }
     , plan = plan'
     , postBuild = return ()
     , distroName = "Stackage"
@@ -178,7 +176,6 @@ getSettings man bf (LTS bumpType goal) Nothing = do
             , ghcVer
             ]
         , slug = "lts-" ++ tshow new
-        , setArgs = \_ ub -> ub { ubLTS = Just $ tshow new }
         , plan = plan'
         , postBuild = do
             let git args = withCheckedProcess
@@ -357,6 +354,6 @@ finallyUpload buildFlags settings@Settings{..} man = do
     case map encodeUtf8 $ words $ decodeUtf8 $ either (const "") id ecreds of
         [username, password] -> do
             putStrLn "Uploading as Hackage distro"
-            res2 <- uploadHackageDistroNamed distroName plan username password man
+            res2 <- uploadHackageDistro distroName plan username password man
             putStrLn $ "Distro upload response: " ++ tshow res2
         _ -> putStrLn "No creds found, skipping Hackage distro upload"
