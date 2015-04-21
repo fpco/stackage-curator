@@ -7,7 +7,7 @@
 {-# LANGUAGE RecordWildCards    #-}
 module Stackage.PerformBuild
     ( performBuild
-    , prefetchPackages
+    , fetch
     , PerformBuild (..)
     , BuildException (..)
     , pbDocDir
@@ -33,6 +33,7 @@ import           System.Environment          (getEnvironment)
 import           System.IO                   (IOMode (WriteMode),
                                               openBinaryFile)
 import           System.IO.Temp              (withSystemTempDirectory)
+import Data.Yaml (decodeFileEither)
 
 data BuildException = BuildException (Map PackageName BuildFailure) [Text]
     deriving Typeable
@@ -153,10 +154,15 @@ performBuild pb = do
         , pbLogDir = cwd </> pbLogDir pb
         }
 
-prefetchPackages :: PerformBuild -> IO ()
-prefetchPackages PerformBuild {..} = do
-    pbLog $ encodeUtf8 "Pre-fetching all packages\n"
-    let toDownload = flip map (mapToList $ bpPackages pbPlan)
+fetch :: FilePath -> IO ()
+fetch fp = do
+    -- First make sure to fetch all of the dependencies... just in case Hackage
+    -- has an outage. Don't feel like wasting hours of CPU time.
+    putStrLn "Pre-fetching all packages"
+
+    plan <- decodeFileEither (fpToString fp) >>= either throwM return
+
+    let toDownload = flip map (mapToList $ bpPackages plan)
             $ \(name, plan) -> unpack $ concat
                 [ display name
                 , "-"
@@ -171,10 +177,6 @@ prefetchPackages PerformBuild {..} = do
 
 performBuild' :: PerformBuild -> IO [Text]
 performBuild' pb@PerformBuild {..} = withBuildDir $ \builddir -> do
-    -- First make sure to fetch all of the dependencies... just in case Hackage
-    -- has an outage. Don't feel like wasting hours of CPU time.
-    prefetchPackages pb
-
     let removeTree' fp = whenM (isDirectory fp) (removeTree fp)
     removeTree' pbLogDir
 

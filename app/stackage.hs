@@ -1,45 +1,62 @@
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 module Main where
 
+import qualified Prelude
 import Control.Monad
-import Data.Monoid
 import Data.String (fromString)
 import Data.Version
-import Options.Applicative
+import Data.Text (pack, stripPrefix)
+import Data.Text.Read (decimal)
+import Options.Applicative hiding ((<>))
 import Filesystem.Path.CurrentOS (decodeString)
 import Paths_stackage_curator (version)
+import Stackage.CLI
 import Stackage.CompleteBuild
 import Stackage.DiffPlans
 import Stackage.Upload
+import Stackage.Update
 import Stackage.InstallBuild
+import Stackage.Prelude
 import Stackage.Stats
 import Network.HTTP.Client (withManager)
 import Network.HTTP.Client.TLS (tlsManagerSettings)
 import qualified Data.Text as T
+import System.IO (hSetBuffering, stdout, BufferMode (LineBuffering))
 
 main :: IO ()
-main =
-    join $
-    execParser $
-    info
-        (helpOption <*> versionOption <*> summaryOption <*> config)
-        (header "Stackage" <>
-         fullDesc)
+main = do
+    hSetBuffering stdout LineBuffering
+    join $ fmap snd $ simpleOptions
+        $(simpleVersion version)
+        "Stackage curation tool"
+        "Build package sets for Stackage Nightly and LTS Haskell"
+        (pure ())
+        commands
   where
-    helpOption =
-        abortOption ShowHelpText $
-        long "help" <>
-        help "Show this help text"
-    versionOption =
-        infoOption
-            ("stackage-curator version " ++ showVersion version)
-            (long "version" <>
-             help "Show stackage version")
-    summaryOption =
-        infoOption
-            "Build package sets for Stackage Nightly and LTS Haskell"
-            (long "summary")
+    commands = do
+        addCommand "update" "Update the package index" id
+            (pure $ stackageUpdate defaultStackageUpdateSettings)
+        addCommand "create-plan" "Generate a new plan file (possibly based on a previous LTS)" id
+            (createPlan <$> target <*> planFile)
+        addCommand "check" "Verify that a plan is valid" id
+            (checkPlan <$> (fmap Just planFile <|> pure Nothing))
+        addCommand "fetch" "Fetch all tarballs needed by a plan" id
+            (fetch <$> planFile)
+{-
+* `make-bundle`: Make an upload bundle from a plan
+* `upload`: Upload a bundle to stackage.org
+* `hackage-distro`: Update the Hackage distro list
+* `upload-github`: Upload a plan to the relevant Github repo
+* `install`: Install a snapshot from an existing build plan
+* `stats`: Print statistics on a build plan
+* `diff`: Show the high-level differences between two build plans
+-}
+
+
+    {-
     config =
         subparser $
         mconcat
@@ -96,12 +113,12 @@ main =
         fmap
             not
             (switch
-                 (long "skip-tests" <>
+                 (long "skip-tests" ++
                   help "Skip build and running the test suites")) <*>
         fmap
             not
             (switch
-                 (long "skip-haddock" <>
+                 (long "skip-haddock" ++
                   help "Skip generating haddock documentation")) <*>
         fmap
             not
@@ -244,7 +261,36 @@ main =
     printStatsFlags = yamlArg
 
     diffPlansFlags = (,) <$> yamlArg <*> yamlArg
+    -}
 
-    yamlArg = fmap decodeString $ strArgument
-         $ metavar "YAML-FILE"
-        <> help "YAML file containing a build plan"
+    target :: Parser Target
+    target = option readTarget
+        ( metavar "TARGET"
+       ++ long "target"
+       ++ help "Build target: nightly, lts-X.Y"
+        )
+
+    readTarget :: ReadM Target
+    readTarget = do
+        s <- str
+        let onErr = fail $ "Invalid target: " ++ s
+        case s of
+            "nightly" -> return TargetNightly
+            'l':'t':'s':'-':t1 -> maybe onErr return $ do
+                Right (i, t2) <- Just $ decimal $ T.pack t1
+                if T.null t2
+                    then return $ TargetMajor i
+                    else do
+                        t3 <- T.stripPrefix (T.pack ".") t2
+                        Right (j, t4) <- Just $ decimal t3
+                        guard $ T.null t4
+                        if j == 0
+                            then return $ TargetMajor i
+                            else return $ TargetMinor i j
+            _ -> onErr
+
+    planFile = fmap decodeString $ strOption
+         ( metavar "YAML-FILE"
+        ++ long "plan-file"
+        ++ help "YAML file containing a build plan"
+         )

@@ -6,9 +6,10 @@ module Stackage.CompleteBuild
     ( BuildType (..)
     , BumpType (..)
     , BuildFlags (..)
-    , completeBuild
-    , justCheck
+    , checkPlan
     , getStackageAuthToken
+    , createPlan
+    , fetch
     ) where
 
 import Control.Concurrent        (threadDelay, getNumCapabilities)
@@ -17,7 +18,7 @@ import Data.Default.Class        (def)
 import Data.Semigroup            (Max (..), Option (..))
 import Data.Text.Read            (decimal)
 import Data.Time
-import Data.Yaml                 (decodeFileEither, encodeFile)
+import Data.Yaml                 (decodeFileEither, encodeFile, decodeEither')
 import Network.HTTP.Client
 import Network.HTTP.Client.TLS   (tlsManagerSettings)
 import Stackage.BuildConstraints
@@ -216,6 +217,39 @@ parseLTSRaw x = do
     Right (minor, "") <- Just $ decimal z
     return $ LTSVer major minor
 
+createPlan :: Target
+           -> FilePath
+           -> IO ()
+createPlan target dest = withManager tlsManagerSettings $ \man -> do
+    putStrLn $ "Creating plan for: " ++ tshow target
+    bc <-
+        case target of
+            TargetMinor x y -> do
+                let url = concat
+                        [ "https://raw.githubusercontent.com/fpco/lts-haskell/master/lts-"
+                        , show x
+                        , "."
+                        , show (y - 1)
+                        , ".yaml"
+                        ]
+                putStrLn $ "Downloading old plan from " ++ pack url
+                req <- parseUrl url
+                res <- httpLbs req man
+                oldplan <- either throwM return
+                         $ decodeEither' (toStrict $ responseBody res)
+                return $ updateBuildConstraints oldplan
+            _ -> defaultBuildConstraints man
+
+    plan <- planFromConstraints bc
+
+    putStrLn $ "Writing build plan to " ++ fpToText dest
+    encodeFile (fpToString dest) plan
+
+planFromConstraints bc = do
+    putStrLn "Creating build plan"
+    plans <- getLatestAllowedPlans bc
+    newBuildPlan plans bc
+
 renderLTSVer :: LTSVer -> FilePath
 renderLTSVer lts = fpFromText $ concat
     [ "lts-"
@@ -236,17 +270,23 @@ stillAlive inner =
 -- | Generate and check a new build plan, but do not execute it.
 --
 -- Since 0.3.1
-justCheck :: IO ()
-justCheck = stillAlive $ withManager tlsManagerSettings $ \man -> do
-    putStrLn "Loading build constraints"
-    bc <- defaultBuildConstraints man
+checkPlan :: Maybe FilePath -> IO ()
+checkPlan mfp = stillAlive $ withManager tlsManagerSettings $ \man -> do
+    plan <-
+        case mfp of
+            Nothing -> do
+                putStrLn "Loading default build constraints"
+                bc <- defaultBuildConstraints man
 
-    putStrLn "Creating build plan"
-    plans <- getLatestAllowedPlans bc
-    plan <- newBuildPlan plans bc
+                plan <- planFromConstraints bc
 
-    putStrLn $ "Writing build plan to check-plan.yaml"
-    encodeFile "check-plan.yaml" plan
+                putStrLn $ "Writing build plan to check-plan.yaml"
+                encodeFile "check-plan.yaml" plan
+
+                return plan
+            Just fp -> do
+                putStrLn $ "Loading plan from " ++ fpToText fp
+                decodeFileEither (fpToString fp) >>= either throwM return
 
     putStrLn "Checking plan"
     checkBuildPlan plan
@@ -272,6 +312,7 @@ getPerformBuild buildFlags Settings {..} = do
         , pbBuildHoogle = bfBuildHoogle buildFlags
         }
 
+{- FIXME remove
 -- | Make a complete plan, build, test and upload bundle, docs and
 -- distro.
 completeBuild :: BuildType -> BuildFlags -> IO ()
@@ -323,6 +364,7 @@ completeBuild buildType buildFlags = withManager tlsManagerSettings $ \man -> do
                     buildFlags
                     settings
                     man
+-}
 
 getStackageAuthToken :: IO Text
 getStackageAuthToken = do

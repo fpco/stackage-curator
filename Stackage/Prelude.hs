@@ -69,3 +69,8 @@ copyDir src dest =
         let dest' = dest </> suffix
         liftIO $ createTree $ parent dest'
         sourceFile fp $$ (sinkFile dest' :: Sink ByteString (ResourceT IO) ())
+
+data Target = TargetNightly
+            | TargetMajor Int
+            | TargetMinor Int Int
+    deriving Show
