@@ -16,6 +16,9 @@ module Stackage.CompleteBuild
     , uploadGithub
     ) where
 
+import System.Directory (getAppUserDataDirectory)
+import Filesystem (isDirectory, createTree)
+import Filesystem.Path (parent)
 import Control.Concurrent        (threadDelay, getNumCapabilities)
 import Control.Concurrent.Async  (withAsync)
 import Data.Default.Class        (def)
@@ -423,11 +426,67 @@ uploadGithub
     :: FilePath -- ^ plan file
     -> Target
     -> IO ()
-uploadGithub = error "uploadGithub"
-{-
-https://github.com/fpco/lts-haskell
-https://github.com/fpco/stackage-nightly
--}
+uploadGithub planFile target = do
+    let repoUrl =
+            case target of
+                TargetNightly -> "git@github.com:fpco/stackage-nightly"
+                _ -> "git@github.com:fpco/lts-haskell"
+
+    root <- fpFromString <$> getAppUserDataDirectory "stackage-curator"
+
+    now <- getCurrentTime
+
+    let repoDir =
+            case target of
+                TargetNightly -> root </> "stackage-nightly"
+                _ -> root </> "lts-haskell"
+
+        destFP =
+            case target of
+                TargetNightly -> repoDir </> (fpFromString $ concat
+                    [ "nightly-"
+                    , show $ utctDay now
+                    , ".yaml"
+                    ])
+                TargetMajor x -> repoDir </> (fpFromString $ concat
+                    [ "lts-"
+                    , show x
+                    , ".0.yaml"
+                    ])
+                TargetMinor x y -> repoDir </> (fpFromString $ concat
+                    [ "lts-"
+                    , show x
+                    , "."
+                    , show y
+                    , ".yaml"
+                    ])
+
+        runIn wdir cmd args = do
+            putStrLn $ concat
+                [ fpToText wdir
+                , ": "
+                , tshow (cmd:args)
+                ]
+            withCheckedProcess
+                (proc cmd args)
+                    { cwd = Just $ fpToString wdir
+                    } $ \ClosedStream Inherited Inherited -> return ()
+
+        git = runIn repoDir "git"
+
+    exists <- isDirectory repoDir
+    if exists
+        then do
+            git ["fetch"]
+            git ["checkout", "origin/master"]
+        else do
+            createTree $ parent repoDir
+            runIn "." "git" ["clone", repoUrl, fpToString repoDir]
+
+    runResourceT $ sourceFile planFile $$ (sinkFile destFP :: Sink ByteString (ResourceT IO) ())
+    git ["add", fpToString destFP]
+    git ["commit", "-m", "Checking in " ++ fpToString (filename destFP)]
+    git ["push", "origin", "HEAD:master"]
 
 upload
     :: FilePath -- ^ bundle file
