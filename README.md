@@ -13,22 +13,6 @@ More information on Stackage:
 * [Stackage Homepage](https://www.stackage.org)
 * [Main stackage repo](https://github.com/fpco/stackage)
 
-### Commands
-
-* `update`: Same as `stackage-update`
-* `create-plan`: Generate a new plan file (possibly based on a previous LTS)
-* `check`: Verify that a plan is valid
-* `fetch`: Fetch all tarballs needed by a plan
-* `make-bundle`: Make an upload bundle from a plan
-* `upload`: Upload a bundle to stackage.org
-* `hackage-distro`: Update the Hackage distro list
-* `upload-github`: Upload a plan to the relevant Github repo
-* `install`: Install a snapshot from an existing build plan
-* `stats`: Print statistics on a build plan
-* `diff`: Show the high-level differences between two build plans
-
-https://github.com/fpco/stackage-nightly
-
 ### Code explanation
 
 We start off with *constraints*. Constraints state things like "package X has a

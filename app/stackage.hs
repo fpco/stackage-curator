@@ -10,7 +10,7 @@ import Data.String (fromString)
 import Data.Version
 import Data.Text (pack, stripPrefix)
 import Data.Text.Read (decimal)
-import Options.Applicative hiding ((<>))
+import Options.Applicative
 import Filesystem.Path.CurrentOS (decodeString)
 import Paths_stackage_curator (version)
 import Stackage.CLI
@@ -19,7 +19,7 @@ import Stackage.DiffPlans
 import Stackage.Upload
 import Stackage.Update
 import Stackage.InstallBuild
-import Stackage.Prelude
+import Stackage.Prelude hiding ((<>))
 import Stackage.Stats
 import Network.HTTP.Client (withManager)
 import Network.HTTP.Client.TLS (tlsManagerSettings)
@@ -49,13 +49,16 @@ main = do
             makeBundle'
         addCommand "upload" "Upload a bundle to Stackage Server" id
             (upload <$> bundleFile <*> stackageServer)
-{-
-* `hackage-distro`: Update the Hackage distro list
-* `upload-github`: Upload a plan to the relevant Github repo
-* `install`: Install a snapshot from an existing build plan
-* `stats`: Print statistics on a build plan
-* `diff`: Show the high-level differences between two build plans
--}
+        addCommand "hackage-distro" "Update the Hackage distro list" id
+            (hackageDistro <$> planFile <*> target)
+        addCommand "upload-github" "Upload a plan to the relevant Github repo" id
+            (uploadGithub <$> planFile <*> target)
+        addCommand "install" "Install a snapshot from an existing build plan" id
+            (installBuild <$> installFlags)
+        addCommand "stats" "Print statistics on a build plan" id
+            (printStats <$> planFile)
+        addCommand "diff" "Show the high-level differences between two build plans" id
+            (diffPlans <$> planFileArg <*> planFileArg)
 
     makeBundle' = makeBundle
         <$> planFile
@@ -99,7 +102,6 @@ main = do
                   installBuild
                   installFlags
                   "install"
-                  "Install a snapshot from an existing build plan"
             , cmnd
                   upload
                   uploadFlags
@@ -171,7 +173,9 @@ main = do
         (switch
             (long "load-plan" <>
              help "Load plan from file"))
+    -}
 
+    installFlags :: Parser InstallFlags
     installFlags =
         InstallFlags <$>
         (fmap
@@ -210,6 +214,11 @@ main = do
         fmap
             not
             (switch
+                (long "skip-tests" <>
+                 help "Skip build and running the test suites")) <*>
+        fmap
+            not
+            (switch
                  (long "skip-haddock" <>
                   help "Skip generating haddock documentation")) <*>
         switch
@@ -229,38 +238,6 @@ main = do
             (switch
                  (long "skip-hoogle" <>
                   help "Skip generating Hoogle input files"))
-
-    upload (path, url) = withManager tlsManagerSettings $ \man -> do
-        token <- getStackageAuthToken
-        res <- flip uploadBundleV2 man UploadBundleV2
-            { ub2AuthToken = token
-            , ub2Server = fromString url
-            , ub2Bundle = decodeString path
-            }
-        putStrLn $ "New URL: " ++ T.unpack res
-
-    uploadFlags = (,)
-        <$> (strArgument
-                (metavar "BUNDLE-PATH" <>
-                 help "Bundle path"))
-        <*> strOption
-                (long "server-url" <>
-                 metavar "SERVER-URL" <>
-                 showDefault <> value (T.unpack $ unStackageServer def) <>
-                 help "Server to upload bundle to")
-
-    lts bumpType = (\x y -> (y, x)) -- get the order of arguments correct
-        <$> buildFlags
-        <*> (LTS bumpType <$> (T.pack <$> argument str
-                ( metavar "TARGET-VERSION"
-               <> help "Used to run old LTS minor bumps, and rerun broken builds"
-               <> value ""
-                ) ) )
-
-    printStatsFlags = yamlArg
-
-    diffPlansFlags = (,) <$> yamlArg <*> yamlArg
-    -}
 
     jobs =
         (fmap Just (option
@@ -333,6 +310,11 @@ main = do
     planFile = fmap decodeString $ strOption
          ( metavar "YAML-FILE"
         ++ long "plan-file"
+        ++ help "YAML file containing a build plan"
+         )
+
+    planFileArg = fmap decodeString $ strArgument
+         ( metavar "YAML-FILE"
         ++ help "YAML file containing a build plan"
          )
 

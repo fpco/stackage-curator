@@ -12,6 +12,8 @@ module Stackage.CompleteBuild
     , fetch
     , makeBundle
     , upload
+    , hackageDistro
+    , uploadGithub
     ) where
 
 import Control.Concurrent        (threadDelay, getNumCapabilities)
@@ -395,13 +397,36 @@ finallyUpload buildFlags settings@Settings{..} man = do
         }
     putStrLn $ "New snapshot available at: " ++ res
 
+-}
+
+hackageDistro
+    :: FilePath -- ^ plan file
+    -> Target
+    -> IO ()
+hackageDistro planFile target = withManager tlsManagerSettings $ \man -> do
+    plan <- decodeFileEither (fpToString planFile) >>= either throwM return
     ecreds <- tryIO $ readFile "/hackage-creds"
     case map encodeUtf8 $ words $ decodeUtf8 $ either (const "") id ecreds of
         [username, password] -> do
-            putStrLn "Uploading as Hackage distro"
+            putStrLn $ "Uploading as Hackage distro: " ++ distroName
             res2 <- uploadHackageDistro distroName plan username password man
             putStrLn $ "Distro upload response: " ++ tshow res2
-        _ -> putStrLn "No creds found, skipping Hackage distro upload"
+        _ -> error "No Hackage creds found at /hackage-creds"
+  where
+    distroName =
+        case target of
+            TargetNightly -> "Stackage"
+            TargetMajor _ -> "LTSHaskell"
+            TargetMinor _ _ -> "LTSHaskell"
+
+uploadGithub
+    :: FilePath -- ^ plan file
+    -> Target
+    -> IO ()
+uploadGithub = error "uploadGithub"
+{-
+https://github.com/fpco/lts-haskell
+https://github.com/fpco/stackage-nightly
 -}
 
 upload
