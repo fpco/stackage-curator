@@ -7,7 +7,6 @@
 {-# LANGUAGE RecordWildCards    #-}
 module Stackage.PerformBuild
     ( performBuild
-    , fetch
     , PerformBuild (..)
     , BuildException (..)
     , pbDocDir
@@ -153,27 +152,6 @@ performBuild pb = do
         { pbInstallDest = cwd </> pbInstallDest pb
         , pbLogDir = cwd </> pbLogDir pb
         }
-
-fetch :: FilePath -> IO ()
-fetch fp = do
-    -- First make sure to fetch all of the dependencies... just in case Hackage
-    -- has an outage. Don't feel like wasting hours of CPU time.
-    putStrLn "Pre-fetching all packages"
-
-    plan <- decodeFileEither (fpToString fp) >>= either throwM return
-
-    let toDownload = flip map (mapToList $ bpPackages plan)
-            $ \(name, plan) -> unpack $ concat
-                [ display name
-                , "-"
-                , display $ ppVersion plan
-                ]
-    withCheckedProcess
-        (proc "cabal"
-            $ "fetch"
-            : "--no-dependencies"
-            : toDownload)
-        $ \ClosedStream Inherited Inherited -> return ()
 
 performBuild' :: PerformBuild -> IO [Text]
 performBuild' pb@PerformBuild {..} = withBuildDir $ \builddir -> do

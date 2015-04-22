@@ -2,6 +2,7 @@
 {-# LANGUAGE NoImplicitPrelude  #-}
 {-# LANGUAGE OverloadedStrings  #-}
 {-# LANGUAGE RecordWildCards    #-}
+{-# LANGUAGE ViewPatterns       #-}
 module Stackage.CompleteBuild
     ( BuildType (..)
     , BumpType (..)
@@ -17,7 +18,7 @@ module Stackage.CompleteBuild
     ) where
 
 import System.Directory (getAppUserDataDirectory)
-import Filesystem (isDirectory, createTree)
+import Filesystem (isDirectory, createTree, isFile, rename)
 import Filesystem.Path (parent)
 import Control.Concurrent        (threadDelay, getNumCapabilities)
 import Control.Concurrent.Async  (withAsync)
@@ -27,6 +28,7 @@ import Data.Text.Read            (decimal)
 import Data.Time
 import Data.Yaml                 (decodeFileEither, encodeFile, decodeEither')
 import Network.HTTP.Client
+import Network.HTTP.Client.Conduit (bodyReaderSource)
 import Network.HTTP.Client.TLS   (tlsManagerSettings)
 import Stackage.BuildConstraints
 import Stackage.BuildPlan
@@ -561,3 +563,43 @@ makeBundle
         , cb2DocsDir = pbDocDir pb
         , cb2Dest = bundleFile
         }
+
+fetch :: FilePath -> IO ()
+fetch planFile = withManager tlsManagerSettings $ \man -> do
+    -- First make sure to fetch all of the dependencies... just in case Hackage
+    -- has an outage. Don't feel like wasting hours of CPU time.
+    putStrLn "Pre-fetching all packages"
+
+    plan <- decodeFileEither (fpToString planFile) >>= either throwM return
+
+    cabalDir <- fpFromString <$> getAppUserDataDirectory "cabal"
+    mapM_ (download man cabalDir) $ mapToList $ bpPackages plan
+  where
+    download man cabalDir (display -> name, display . ppVersion -> version) = do
+        unlessM (isFile fp) $ do
+            putStrLn $ concat
+                [ "Downloading "
+                , name
+                , "-"
+                , version
+                ]
+            createTree $ parent fp
+            req <- parseUrl url
+            withResponse req man $ \res -> do
+                let tmp = fp <.> "tmp"
+                runResourceT $ bodyReaderSource (responseBody res) $$ sinkFile tmp
+                rename tmp fp
+      where
+        url = unpack $ concat
+            [ "https://s3.amazonaws.com/hackage.fpcomplete.com/package/"
+            , name
+            , "-"
+            , version
+            , ".tar.gz"
+            ]
+        fp = cabalDir </>
+             "packages" </>
+             "hackage.haskell.org" </>
+             fpFromText name </>
+             fpFromText version </>
+             fpFromText (concat [name, "-", version, ".tar.gz"])
