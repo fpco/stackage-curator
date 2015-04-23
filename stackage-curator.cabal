@@ -70,6 +70,7 @@ library
                      , xml-conduit
                      , conduit
                      , stackage-types
+                     , monad-unlift
 
 executable stackage-curator
   default-language:    Haskell2010

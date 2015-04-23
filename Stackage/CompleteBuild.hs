@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE FlexibleContexts   #-}
 {-# LANGUAGE NoImplicitPrelude  #-}
 {-# LANGUAGE OverloadedStrings  #-}
 {-# LANGUAGE RecordWildCards    #-}
@@ -40,6 +41,9 @@ import Stackage.UpdateBuildPlan
 import Stackage.Upload
 import System.Environment        (lookupEnv)
 import System.IO                 (BufferMode (LineBuffering), hSetBuffering)
+import Control.Monad.Trans.Unlift (askRunBase, MonadBaseUnlift)
+import Data.Function (fix)
+import Control.Concurrent.Async (Concurrently (..))
 
 -- | Flags passed in from the command line.
 data BuildFlags = BuildFlags
@@ -573,15 +577,16 @@ fetch planFile = withManager tlsManagerSettings $ \man -> do
     plan <- decodeFileEither (fpToString planFile) >>= either throwM return
 
     cabalDir <- fpFromString <$> getAppUserDataDirectory "cabal"
-    mapM_ (download man cabalDir) $ mapToList $ bpPackages plan
+    parMapM_ 8 (download man cabalDir) $ mapToList $ bpPackages plan
   where
     download man cabalDir (display -> name, display . ppVersion -> version) = do
         unlessM (isFile fp) $ do
-            putStrLn $ concat
+            hPut stdout $ encodeUtf8 $ concat
                 [ "Downloading "
                 , name
                 , "-"
                 , version
+                , "\n"
                 ]
             createTree $ parent fp
             req <- parseUrl url
@@ -603,3 +608,26 @@ fetch planFile = withManager tlsManagerSettings $ \man -> do
              fpFromText name </>
              fpFromText version </>
              fpFromText (concat [name, "-", version, ".tar.gz"])
+
+parMapM_ :: (MonadIO m, MonadBaseUnlift IO m, MonoFoldable mono)
+         => Int
+         -> (Element mono -> m ())
+         -> mono
+         -> m ()
+parMapM_ (max 1 -> 1) f xs = mapM_ f xs
+parMapM_ cnt f xs0 = do
+    var <- liftBase $ newTVarIO $ toList xs0
+    run <- askRunBase
+    let worker :: IO ()
+        worker = run $ fix $ \loop -> join $ atomically $ do
+            xs <- readTVar var
+            case xs of
+                [] -> return $ return ()
+                x:xs' -> do
+                    writeTVar var xs'
+                    return $ do
+                        f x
+                        loop
+        workers 1 = Concurrently worker
+        workers i = Concurrently worker *> workers (i - 1)
+    liftBase $ runConcurrently $ workers cnt
