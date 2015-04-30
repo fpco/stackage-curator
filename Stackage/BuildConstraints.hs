@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TupleSections     #-}
+{-# LANGUAGE GADTs             #-}
 -- | The constraints on package selection for a new build plan.
 module Stackage.BuildConstraints
     ( BuildConstraints (..)

@@ -4,6 +4,7 @@
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE TupleSections              #-}
+{-# LANGUAGE FlexibleContexts           #-}
 module Stackage.Upload
     ( uploadHackageDistro
     , uploadBundleV2

@@ -1,3 +1,7 @@
+## 0.8.0.1
+
+* GHC 7.10 support
+
 ## 0.8.0
 
 * Restructured commands to work on server/Docker setup

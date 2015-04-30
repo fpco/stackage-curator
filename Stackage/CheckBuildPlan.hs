@@ -5,6 +5,7 @@
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE ViewPatterns               #-}
+{-# LANGUAGE TypeFamilies               #-}
 -- | Confirm that a build plan has a consistent set of dependencies.
 module Stackage.CheckBuildPlan
     ( checkBuildPlan

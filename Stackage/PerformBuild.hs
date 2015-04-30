@@ -5,6 +5,7 @@
 {-# LANGUAGE NoImplicitPrelude  #-}
 {-# LANGUAGE OverloadedStrings  #-}
 {-# LANGUAGE RecordWildCards    #-}
+{-# LANGUAGE FlexibleContexts   #-}
 module Stackage.PerformBuild
     ( performBuild
     , PerformBuild (..)

@@ -1,4 +1,6 @@
 {-# LANGUAGE OverloadedStrings, NoImplicitPrelude #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE FlexibleContexts #-}
 module Stackage.DiffPlans
     ( diffPlans
     ) where

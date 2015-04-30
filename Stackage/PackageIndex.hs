@@ -4,6 +4,7 @@
 {-# LANGUAGE OverloadedStrings  #-}
 {-# LANGUAGE RankNTypes         #-}
 {-# LANGUAGE ViewPatterns       #-}
+{-# LANGUAGE GADTs              #-}
 -- | Dealing with the 00-index file and all its cabal files.
 module Stackage.PackageIndex
     ( sourcePackageIndex
