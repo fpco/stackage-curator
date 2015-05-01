@@ -1,20 +1,20 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE FlexibleContexts  #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE GADTs             #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Stackage.CorePackages
     ( getCorePackages
     , getCoreExecutables
     , getGhcVersion
     ) where
 
-import qualified Data.Text        as T
-import           Filesystem       (listDirectory)
+import           Control.Monad.State.Strict (StateT, execStateT, get, modify,
+                                             put)
+import qualified Data.Map.Lazy              as Map
+import qualified Data.Text                  as T
+import           Filesystem                 (listDirectory)
 import           Stackage.Prelude
-import           System.Directory (findExecutable)
-import Control.Monad.State.Strict
-import qualified Data.Map.Lazy as Map
+import           System.Directory           (findExecutable)
 
 addDeepDepends :: PackageName -> StateT (Map PackageName Version) IO ()
 addDeepDepends name@(PackageName name') = do
@@ -92,7 +92,11 @@ addDeepDepends name@(PackageName name') = do
 -- Precondition: GHC global package database has only core packages, and GHC
 -- ships with just a single version of each packages.
 getCorePackages :: IO (Map PackageName Version)
-getCorePackages = execStateT (addDeepDepends (PackageName "ghc")) mempty
+getCorePackages = flip execStateT mempty $ mapM_ (addDeepDepends . PackageName)
+    [ "ghc"
+    , "haskell2010"
+    , "haskell98"
+    ]
 
 -- | A list of executables that are shipped with GHC.
 getCoreExecutables :: IO (Set ExeName)
