@@ -1,3 +1,7 @@
+## 0.8.1
+
+* Redefine core packages [#395](https://github.com/fpco/stackage/issues/395)
+
 ## 0.8.0.1
 
 * GHC 7.10 support
