@@ -94,8 +94,10 @@ addDeepDepends name@(PackageName name') = do
 getCorePackages :: IO (Map PackageName Version)
 getCorePackages = flip execStateT mempty $ mapM_ (addDeepDepends . PackageName)
     [ "ghc"
+    {-
     , "haskell2010"
     , "haskell98"
+    -}
     ]
 
 -- | A list of executables that are shipped with GHC.
