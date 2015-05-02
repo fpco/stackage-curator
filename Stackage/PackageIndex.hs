@@ -80,7 +80,7 @@ sourcePackageIndex = do
         | otherwise = return ()
 
     goContent fp name version lbs =
-        case parsePackageDescription $ unpack $ decodeUtf8 lbs of
+        case parsePackageDescription $ unpack $ dropBOM $ decodeUtf8 lbs of
             ParseFailed e -> throwM $ CabalParseException (fpFromString fp) e
             ParseOk _warnings gpd -> do
                 let pd = packageDescription gpd
@@ -89,6 +89,9 @@ sourcePackageIndex = do
                     throwM $ MismatchedNameVersion (fpFromString fp)
                         name name' version version'
                 return gpd
+
+    -- https://github.com/haskell/hackage-server/issues/351
+    dropBOM t = fromMaybe t $ stripPrefix "\xFEFF" t
 
     parseNameVersion t1 = do
         let (p', t2) = break (== '/') $ T.replace "\\" "/" t1
