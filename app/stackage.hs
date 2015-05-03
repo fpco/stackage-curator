@@ -40,7 +40,11 @@ main = do
         addCommand "update" "Update the package index" id
             (pure $ stackageUpdate defaultStackageUpdateSettings)
         addCommand "create-plan" "Generate a new plan file (possibly based on a previous LTS)" id
-            (createPlan <$> target <*> planFile)
+            (createPlan
+                <$> target
+                <*> planFile
+                <*> many constraint
+                )
         addCommand "check" "Verify that a plan is valid" id
             (checkPlan <$> (fmap Just planFile <|> pure Nothing))
         addCommand "fetch" "Fetch all tarballs needed by a plan" id
@@ -330,3 +334,15 @@ main = do
              metavar "SERVER-URL" ++
              showDefault ++ value (T.unpack $ unStackageServer def) ++
              help "Server to upload bundle to")))
+
+    constraint =
+        option constraintRead
+            (long "constraint" ++
+             metavar "CONSTRAINT" ++
+             help "New constraints for plan construction")
+
+    constraintRead = do
+        s <- str
+        case simpleParse $ T.pack s of
+            Nothing -> fail $ "Invalid constraint: " ++ s
+            Just d -> return d

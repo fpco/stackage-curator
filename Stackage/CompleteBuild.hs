@@ -19,6 +19,7 @@ module Stackage.CompleteBuild
     ) where
 
 import System.Directory (getAppUserDataDirectory)
+import Distribution.Package (Dependency)
 import Filesystem (isDirectory, createTree, isFile, rename)
 import Filesystem.Path (parent)
 import Control.Concurrent        (threadDelay, getNumCapabilities)
@@ -232,8 +233,9 @@ parseLTSRaw x = do
 
 createPlan :: Target
            -> FilePath
+           -> [Dependency] -- ^ additional constraints
            -> IO ()
-createPlan target dest = withManager tlsManagerSettings $ \man -> do
+createPlan target dest constraints = withManager tlsManagerSettings $ \man -> do
     putStrLn $ "Creating plan for: " ++ tshow target
     bc <-
         case target of
@@ -253,7 +255,7 @@ createPlan target dest = withManager tlsManagerSettings $ \man -> do
                 return $ updateBuildConstraints oldplan
             _ -> defaultBuildConstraints man
 
-    plan <- planFromConstraints bc
+    plan <- planFromConstraints $ setConstraints constraints bc
 
     putStrLn $ "Writing build plan to " ++ fpToText dest
     encodeFile (fpToString dest) plan

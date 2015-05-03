@@ -14,6 +14,7 @@ module Stackage.BuildConstraints
     , toBC
     , BuildConstraintsSource (..)
     , loadBuildConstraints
+    , setConstraints
     ) where
 
 import           Control.Monad.Writer.Strict (execWriter, tell)
@@ -39,6 +40,22 @@ data BuildConstraints = BuildConstraints
     , bcGithubUsers        :: Map Text (Set Text)
     -- ^ map an account to set of pingees
     }
+
+-- | Modify the version bounds with the given Dependencies
+setConstraints :: [Dependency] -> BuildConstraints -> BuildConstraints
+setConstraints deps bc =
+    bc { bcPackageConstraints = f }
+  where
+    depMap = unionsWith intersectVersionRanges $ map toMap deps
+    toMap (Dependency k v) = asMap $ singletonMap k v
+
+    f' = bcPackageConstraints bc
+    f pkg =
+        case lookup pkg depMap of
+            Nothing -> pc
+            Just vr -> pc { pcVersionRange = vr }
+      where
+        pc = f' pkg
 
 -- | The proposed plan from the requirements provided by contributors.
 --

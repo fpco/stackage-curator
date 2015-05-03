@@ -1,6 +1,7 @@
 ## 0.8.1
 
 * Redefine core packages [#395](https://github.com/fpco/stackage/issues/395)
+* Add --constraint flag for create-plan
 
 ## 0.8.0.1
 
