@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
@@ -109,6 +110,7 @@ data ConstraintFile = ConstraintFile
     , cfPackages                :: Map Maintainer (Vector Dependency)
     , cfGithubUsers             :: Map Text (Set Text)
     , cfSkippedLibProfiling     :: Set PackageName
+    , cfGhcMajorVersion         :: Maybe (Int, Int)
     }
 
 instance FromJSON ConstraintFile where
@@ -123,6 +125,7 @@ instance FromJSON ConstraintFile where
                   >>= mapM (mapM toDep)
                     . Map.mapKeysWith const Maintainer
         cfGithubUsers <- o .: "github-users"
+        cfGhcMajorVersion <- o .:? "ghc-major-version" >>= mapM parseMajorVersion
         return ConstraintFile {..}
       where
         goFlagMap = Map.mapKeysWith const FlagName
@@ -132,9 +135,26 @@ instance FromJSON ConstraintFile where
         toDep :: Monad m => Text -> m Dependency
         toDep = either (fail . show) return . simpleParse
 
+        parseMajorVersion t =
+            case versionBranch <$> simpleParse t of
+                Just [x, y] -> return (x, y)
+                _ -> fail $ "Invalid GHC major version: " ++ unpack t
+
+data MismatchedGhcVersion = MismatchedGhcVersion
+    { mgvGhcOnPath :: !Version
+    , mgvExpectedMajor :: !Int
+    , mgcExpectedMinor :: !Int
+    }
+    deriving (Show, Typeable)
+instance Exception MismatchedGhcVersion
+
 toBC :: ConstraintFile -> IO BuildConstraints
 toBC ConstraintFile {..} = do
     bcSystemInfo <- getSystemInfo
+    forM_ cfGhcMajorVersion $ \(major, minor) ->
+        case versionBranch $ siGhcVersion bcSystemInfo of
+            major':minor':_ | major == major' && minor == minor' -> return ()
+            _ -> throwIO $ MismatchedGhcVersion (siGhcVersion bcSystemInfo) major minor
     return BuildConstraints {..}
   where
     combine (maintainer, range1) (_, range2) =
