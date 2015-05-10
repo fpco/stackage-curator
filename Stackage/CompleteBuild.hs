@@ -524,7 +524,7 @@ uploadDocs' target = do
             TargetMajor x -> return $ concat ["lts-", tshow x, ".0"]
             TargetMinor x y -> return $ concat ["lts-", tshow x, ".", tshow y]
     uploadDocs
-        (installDest target </> "docs")
+        (installDest target </> "doc")
         name
         "haddock.stackage.org"
 
