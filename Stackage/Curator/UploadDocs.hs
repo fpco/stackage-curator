@@ -54,7 +54,7 @@ upload env bucket name = do
     putStrLn $ "Sending " ++ name
     eres <- liftResourceT $ send env po
     case eres of
-        Left e -> throwIO e
+        Left e -> error $ show e
         Right _ -> return ()
 
 -- | Uses 'getEnv' for S3 credentials.
