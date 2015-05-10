@@ -442,7 +442,7 @@ uploadGithub planFile target = do
                 TargetNightly -> "git@github.com:fpco/stackage-nightly"
                 _ -> "git@github.com:fpco/lts-haskell"
 
-    root <- fpFromString <$> getAppUserDataDirectory "stackage-curator"
+    root <- fmap (</> "curator") $ fpFromString <$> getAppUserDataDirectory "stackage"
 
     now <- getCurrentTime
 
