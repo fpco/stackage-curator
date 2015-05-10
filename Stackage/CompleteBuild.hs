@@ -16,6 +16,7 @@ module Stackage.CompleteBuild
     , upload
     , hackageDistro
     , uploadGithub
+    , uploadDocs'
     ) where
 
 import System.Directory (getAppUserDataDirectory)
@@ -45,6 +46,7 @@ import System.IO                 (BufferMode (LineBuffering), hSetBuffering)
 import Control.Monad.Trans.Unlift (askRunBase, MonadBaseUnlift)
 import Data.Function (fix)
 import Control.Concurrent.Async (Concurrently (..))
+import Stackage.Curator.UploadDocs (uploadDocs)
 
 -- | Flags passed in from the command line.
 data BuildFlags = BuildFlags
@@ -512,6 +514,27 @@ upload bundleFile server = withManager tlsManagerSettings $ \man -> do
         }
     putStrLn $ "New snapshot available at: " ++ res
 
+uploadDocs' :: Target -> IO ()
+uploadDocs' target = do
+    name <-
+        case target of
+            TargetNightly -> do
+                now <- getCurrentTime
+                return $ "nightly-" ++ tshow (utctDay now)
+            TargetMajor x -> return $ concat ["lts-", tshow x, ".0"]
+            TargetMinor x y -> return $ concat ["lts-", tshow x, ".", tshow y]
+    uploadDocs
+        (installDest target </> "docs")
+        name
+        "haddock.stackage.org"
+
+installDest :: Target -> FilePath
+installDest target =
+    case target of
+        TargetNightly -> "builds/nightly"
+        TargetMajor x -> fpFromText $ "builds/lts-" ++ tshow x
+        TargetMinor x _ -> fpFromText $ "builds/lts-" ++ tshow x
+
 makeBundle
     :: FilePath -- ^ plan file
     -> FilePath -- ^ bundle file
@@ -533,11 +556,7 @@ makeBundle
     jobs <- maybe getNumCapabilities return mjobs
     let pb = PerformBuild
             { pbPlan = plan
-            , pbInstallDest =
-                case target of
-                    TargetNightly -> "builds/nightly"
-                    TargetMajor x -> fpFromText $ "builds/lts-" ++ tshow x
-                    TargetMinor x _ -> fpFromText $ "builds/lts-" ++ tshow x
+            , pbInstallDest = installDest target
             , pbLog = hPut stdout
             , pbLogDir =
                 case target of

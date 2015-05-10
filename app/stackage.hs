@@ -63,6 +63,8 @@ main = do
             (printStats <$> planFile)
         addCommand "diff" "Show the high-level differences between two build plans" id
             (diffPlans <$> planFileArg <*> planFileArg)
+        addCommand "upload-docs" "Upload documentation to an S3 bucket" id
+            (uploadDocs' <$> target)
 
     makeBundle' = makeBundle
         <$> planFile
