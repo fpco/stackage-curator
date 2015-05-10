@@ -1,3 +1,7 @@
+## 0.8.2
+
+* `upload-docs` command
+
 ## 0.8.1
 
 * Redefine core packages [#395](https://github.com/fpco/stackage/issues/395)

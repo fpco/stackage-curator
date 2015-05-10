@@ -65,9 +65,8 @@ uploadDocs :: FilePath -- ^ directory containing docs
 uploadDocs input' name bucket = do
     env <- getEnv NorthVirginia Discover
 
-    [input', name, bucket] <- getArgs
-
-    input <- fmap (</> "") $ F.canonicalizePath $ fpFromText input'
+    unlessM (F.isDirectory input') $ error $ "Could not find directory: " ++ show input'
+    input <- fmap (</> "") $ F.canonicalizePath input'
 
     runResourceT $ flip runReaderT (env, bucket) $ flip evalStateT mempty $
         sourceDirectoryDeep False input
