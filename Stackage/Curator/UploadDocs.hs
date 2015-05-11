@@ -1,17 +1,21 @@
-{-# LANGUAGE ConstraintKinds   #-}
-{-# LANGUAGE FlexibleContexts  #-}
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RankNTypes        #-}
-{-# LANGUAGE TypeFamilies      #-}
+{-# LANGUAGE ConstraintKinds       #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE RankNTypes            #-}
+{-# LANGUAGE TypeFamilies          #-}
 -- | Upload Haddock documentation to S3.
 module Stackage.Curator.UploadDocs
     ( uploadDocs
     ) where
 import           ClassyPrelude.Conduit
+import qualified Codec.Archive.Tar             as Tar
+import qualified Codec.Archive.Tar.Entry       as Tar
 import           Control.Monad.State.Strict    (MonadState, evalStateT, get,
                                                 modify)
 import           Control.Monad.Trans.Resource  (liftResourceT)
+import           Control.Monad.Writer.Strict   (MonadWriter, execWriterT, tell)
 import           Crypto.Hash                   (Digest, SHA256)
 import           Crypto.Hash.Conduit           (sinkHash)
 import           Data.Byteable                 (toBytes)
@@ -68,11 +72,18 @@ uploadDocs input' name bucket = do
     unlessM (F.isDirectory input') $ error $ "Could not find directory: " ++ show input'
     input <- fmap (</> "") $ F.canonicalizePath input'
 
-    runResourceT $ flip runReaderT (env, bucket) $ flip evalStateT mempty $
-        sourceDirectoryDeep False input
-        $$ mapM_C (go input name)
+    runResourceT $ flip runReaderT (env, bucket) $ flip evalStateT mempty $ do
+        hoogles <- execWriterT $ sourceDirectoryDeep False input $$ mapM_C (go input name)
+        lbs <- liftIO $ fmap Tar.write $ mapM toEntry $ hoogles []
+        upload' (name ++ "/hoogles.tar.gz") $ sourceLazy lbs =$= compress 9 (WindowBits 31)
 
-upload' :: M m
+-- | Create a TAR entry for each Hoogle txt file. Unfortunately doesn't stream.
+toEntry :: FilePath -> IO Tar.Entry
+toEntry fp = do
+    tp <- either error return $ Tar.toTarPath False $ fpToString $ F.filename fp
+    Tar.packFileEntry (fpToString fp) tp
+
+upload' :: (MonadResource m, MonadReader (Env, Text) m)
         => Text -- ^ S3 key
         -> Source (ResourceT IO) ByteString
         -> m ()
@@ -86,6 +97,7 @@ go :: M m
    -> FilePath -- ^ current file
    -> m ()
 go input name fp
+    | hasExtension fp "txt" = tell (fp:)
     | hasExtension fp "html" = do
         doc <- sourceFile fp
             $= eventConduit
@@ -141,6 +153,7 @@ isRef _ = False
 type M m = ( MonadReader (Env, Text) m
            , MonadResource m
            , MonadState (Map FilePath Text) m
+           , MonadWriter ([FilePath] -> [FilePath]) m
            )
 
 getName :: M m => FilePath -> m Text
