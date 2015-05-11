@@ -198,18 +198,17 @@ main = do
         s <- str
         let onErr = fail $ "Invalid target: " ++ s
         case s of
-            "nightly" -> return TargetNightly
+            'n':'i':'g':'h':'t':'l':'y':'-':t ->
+                maybe onErr (return . TargetNightly) (readMay t)
             'l':'t':'s':'-':t1 -> maybe onErr return $ do
                 Right (i, t2) <- Just $ decimal $ T.pack t1
                 if T.null t2
-                    then return $ TargetMajor i
+                    then return $ TargetLts i 0
                     else do
                         t3 <- T.stripPrefix (T.pack ".") t2
                         Right (j, t4) <- Just $ decimal t3
                         guard $ T.null t4
-                        if j == 0
-                            then return $ TargetMajor i
-                            else return $ TargetMinor i j
+                        return $ TargetLts i j
             _ -> onErr
 
     planFile = fmap decodeString $ strOption

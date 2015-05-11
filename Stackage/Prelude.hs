@@ -70,7 +70,6 @@ copyDir src dest =
         liftIO $ createTree $ parent dest'
         sourceFile fp $$ (sinkFile dest' :: Sink ByteString (ResourceT IO) ())
 
-data Target = TargetNightly
-            | TargetMajor Int
-            | TargetMinor Int Int
+data Target = TargetNightly !Day
+            | TargetLts !Int !Int
     deriving Show
