@@ -75,7 +75,7 @@ uploadDocs input' name bucket = do
     runResourceT $ flip runReaderT (env, bucket) $ flip evalStateT mempty $ do
         hoogles <- execWriterT $ sourceDirectoryDeep False input $$ mapM_C (go input name)
         lbs <- liftIO $ fmap Tar.write $ mapM toEntry $ hoogles []
-        upload' (name ++ "/hoogles.tar.gz") $ sourceLazy lbs =$= compress 9 (WindowBits 31)
+        upload' (name ++ "/hoogle/orig.tar.gz") $ sourceLazy lbs =$= compress 9 (WindowBits 31)
 
 -- | Create a TAR entry for each Hoogle txt file. Unfortunately doesn't stream.
 toEntry :: FilePath -> IO Tar.Entry
