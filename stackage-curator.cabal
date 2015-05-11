@@ -71,7 +71,7 @@ library
                      , xml-conduit
                      , conduit
                      , stackage-types >= 1.0.1
-                     , monad-unlift
+                     , monad-unlift >= 0.1.1
 
                      , blaze-html
                      , html-conduit

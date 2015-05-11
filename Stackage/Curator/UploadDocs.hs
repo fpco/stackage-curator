@@ -12,10 +12,9 @@ module Stackage.Curator.UploadDocs
 import           ClassyPrelude.Conduit
 import qualified Codec.Archive.Tar             as Tar
 import qualified Codec.Archive.Tar.Entry       as Tar
-import           Control.Monad.State.Strict    (MonadState, evalStateT, get,
-                                                modify, put)
 import           Control.Monad.Trans.Resource  (liftResourceT)
-import           Control.Monad.Writer.Strict   (MonadWriter, execWriterT, tell)
+import           Control.Monad.Trans.RWS.Ref   (MonadRWS, get, modify, put,
+                                                runRWSIORefT, tell)
 import           Crypto.Hash                   (Digest, SHA256)
 import           Crypto.Hash.Conduit           (sinkHash)
 import           Data.Byteable                 (toBytes)
@@ -72,10 +71,13 @@ uploadDocs input' name bucket = do
     unlessM (F.isDirectory input') $ error $ "Could not find directory: " ++ show input'
     input <- fmap (</> "") $ F.canonicalizePath input'
 
-    runResourceT $ flip runReaderT (env, bucket) $ flip evalStateT mempty $ do
-        hoogles <- execWriterT $ sourceDirectoryDeep False input $$ mapM_C (go input name)
-        lbs <- liftIO $ fmap Tar.write $ mapM toEntry $ hoogles []
-        upload' (name ++ "/hoogle/orig.tar.gz") $ sourceLazy lbs =$= compress 9 (WindowBits 31)
+    let inner = sourceDirectoryDeep False input $$ mapM_C (go input name)
+    runResourceT $ do
+        ((), _, hoogles) <- runRWSIORefT inner (env, bucket) mempty
+
+        lbs <- liftIO $ fmap Tar.write $ mapM toEntry $ toList hoogles
+        flip runReaderT (env, bucket) $
+            upload' (name ++ "/hoogle/orig.tar.gz") $ sourceLazy lbs =$= compress 9 (WindowBits 31)
 
 -- | Create a TAR entry for each Hoogle txt file. Unfortunately doesn't stream.
 toEntry :: FilePath -> IO Tar.Entry
@@ -97,7 +99,7 @@ go :: M m
    -> FilePath -- ^ current file
    -> m ()
 go input name fp
-    | hasExtension fp "txt" = tell (fp:)
+    | hasExtension fp "txt" = tell $! singletonSet fp
     | hasExtension fp "html" = do
         doc <- sourceFile fp
             $= eventConduit
@@ -150,10 +152,8 @@ isRef "href" = True
 isRef "src" = True
 isRef _ = False
 
-type M m = ( MonadReader (Env, Text) m
+type M m = ( MonadRWS (Env, Text) (Set FilePath) (Map FilePath Text, Set Text) m
            , MonadResource m
-           , MonadState (Map FilePath Text, Set Text) m
-           , MonadWriter ([FilePath] -> [FilePath]) m
            )
 
 getName :: M m => FilePath -> m Text
