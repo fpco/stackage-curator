@@ -77,7 +77,7 @@ uploadDocs input' name bucket = do
 
         lbs <- liftIO $ fmap Tar.write $ mapM toEntry $ toList hoogles
         flip runReaderT (env, bucket) $
-            upload' (name ++ "/hoogle/orig.tar.gz") $ sourceLazy lbs =$= compress 9 (WindowBits 31)
+            upload' (name ++ "/hoogle/orig.tar") $ sourceLazy lbs
 
 -- | Create a TAR entry for each Hoogle txt file. Unfortunately doesn't stream.
 toEntry :: FilePath -> IO Tar.Entry
