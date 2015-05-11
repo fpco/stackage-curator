@@ -13,7 +13,7 @@ import           ClassyPrelude.Conduit
 import qualified Codec.Archive.Tar             as Tar
 import qualified Codec.Archive.Tar.Entry       as Tar
 import           Control.Monad.State.Strict    (MonadState, evalStateT, get,
-                                                modify)
+                                                modify, put)
 import           Control.Monad.Trans.Resource  (liftResourceT)
 import           Control.Monad.Writer.Strict   (MonadWriter, execWriterT, tell)
 import           Crypto.Hash                   (Digest, SHA256)
@@ -152,18 +152,18 @@ isRef _ = False
 
 type M m = ( MonadReader (Env, Text) m
            , MonadResource m
-           , MonadState (Map FilePath Text) m
+           , MonadState (Map FilePath Text, Set Text) m
            , MonadWriter ([FilePath] -> [FilePath]) m
            )
 
 getName :: M m => FilePath -> m Text
 getName src = do
-    m <- get
+    (m, _) <- get
     case lookup src m of
         Just x -> return x
         Nothing -> do
             x <- toHash src
-            modify $ asMap . insertMap src x
+            modify $ \(m, s) -> (insertMap src x m, s)
             return x
 
 toHash :: M m => FilePath -> m Text
@@ -171,7 +171,10 @@ toHash src = do
     (digest, lbs) <- sourceFile src $$ sink
     let hash' = decodeUtf8 $ B16.encode $ toBytes (digest :: Digest SHA256)
         name = fpToText $ F.addExtensions ("byhash" </> fpFromText hash') (F.extensions src)
-    upload' name $ sourceLazy lbs
+    (m, s) <- get
+    unless (name `member` s) $ do
+        put (m, insertSet name s)
+        upload' name $ sourceLazy lbs
     return name
   where
     sink = getZipSink $ (,)
