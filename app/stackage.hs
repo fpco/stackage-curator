@@ -51,6 +51,8 @@ main = do
             (fetch <$> planFile)
         addCommand "make-bundle" "Run a complete build and generate an upload bundle" id
             makeBundle'
+        addCommand "check-target-available" "Is the given target available to be used?" id
+            (checkTargetAvailable <$> target)
         addCommand "upload" "Upload a bundle to Stackage Server" id
             (upload <$> bundleFile <*> stackageServer)
         addCommand "hackage-distro" "Update the Hackage distro list" id

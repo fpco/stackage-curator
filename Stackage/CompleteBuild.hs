@@ -17,6 +17,7 @@ module Stackage.CompleteBuild
     , hackageDistro
     , uploadGithub
     , uploadDocs'
+    , checkTargetAvailable
     ) where
 
 import System.Directory (getAppUserDataDirectory)
@@ -361,25 +362,27 @@ hackageDistro planFile target = withManager tlsManagerSettings $ \man -> do
             TargetNightly _ -> "Stackage"
             TargetLts _ _ -> "LTSHaskell"
 
-uploadGithub
-    :: FilePath -- ^ plan file
-    -> FilePath -- ^ docmap file
-    -> Target
-    -> IO ()
-uploadGithub planFile docmapFile target = do
-    let repoUrl =
-            case target of
-                TargetNightly _ -> "git@github.com:fpco/stackage-nightly"
-                TargetLts _ _ -> "git@github.com:fpco/lts-haskell"
-
+checkoutRepo :: Target -> IO ([String] -> IO (), FilePath, FilePath)
+checkoutRepo target = do
     root <- fmap (</> "curator") $ fpFromString <$> getAppUserDataDirectory "stackage"
-
-    now <- getCurrentTime
 
     let repoDir =
             case target of
                 TargetNightly _ -> root </> "stackage-nightly"
                 TargetLts _ _ -> root </> "lts-haskell"
+
+        runIn wdir cmd args = do
+            putStrLn $ concat
+                [ fpToText wdir
+                , ": "
+                , tshow (cmd:args)
+                ]
+            withCheckedProcess
+                (proc cmd args)
+                    { cwd = Just $ fpToString wdir
+                    } $ \ClosedStream Inherited Inherited -> return ()
+
+        git = runIn repoDir "git"
 
         name =
             case target of
@@ -399,19 +402,6 @@ uploadGithub planFile docmapFile target = do
         destFPPlan = repoDir </> name
         destFPDocmap = repoDir </> "docs" </> name
 
-        runIn wdir cmd args = do
-            putStrLn $ concat
-                [ fpToText wdir
-                , ": "
-                , tshow (cmd:args)
-                ]
-            withCheckedProcess
-                (proc cmd args)
-                    { cwd = Just $ fpToString wdir
-                    } $ \ClosedStream Inherited Inherited -> return ()
-
-        git = runIn repoDir "git"
-
     exists <- isDirectory repoDir
     if exists
         then do
@@ -421,12 +411,33 @@ uploadGithub planFile docmapFile target = do
             createTree $ parent repoDir
             runIn "." "git" ["clone", repoUrl, fpToString repoDir]
 
+    whenM (liftIO $ isFile destFPPlan)
+        $ error $ "File already exists: " ++ fpToString destFPPlan
+    whenM (liftIO $ isFile destFPDocmap)
+        $ error $ "File already exists: " ++ fpToString destFPDocmap
+
+    return (git, destFPPlan, destFPDocmap)
+  where
+    repoUrl =
+        case target of
+            TargetNightly _ -> "git@github.com:fpco/stackage-nightly"
+            TargetLts _ _ -> "git@github.com:fpco/lts-haskell"
+
+uploadGithub
+    :: FilePath -- ^ plan file
+    -> FilePath -- ^ docmap file
+    -> Target
+    -> IO ()
+uploadGithub planFile docmapFile target = do
+    (git, destFPPlan, destFPDocmap) <- checkoutRepo target
+
     createTree $ parent destFPDocmap
     runResourceT $ do
         sourceFile planFile $$ (sinkFile destFPPlan :: Sink ByteString (ResourceT IO) ())
         sourceFile docmapFile $$ (sinkFile destFPDocmap :: Sink ByteString (ResourceT IO) ())
+
     git ["add", fpToString destFPPlan, fpToString destFPDocmap]
-    git ["commit", "-m", "Checking in " ++ fpToString name]
+    git ["commit", "-m", "Checking in " ++ fpToString (basename destFPPlan)]
     git ["push", "origin", "HEAD:master"]
 
 upload
@@ -582,3 +593,7 @@ parMapM_ cnt f xs0 = do
         workers 1 = Concurrently worker
         workers i = Concurrently worker *> workers (i - 1)
     liftBase $ runConcurrently $ workers cnt
+
+-- | Check if the given target is already used in the Github repos
+checkTargetAvailable :: Target -> IO ()
+checkTargetAvailable = void . checkoutRepo
