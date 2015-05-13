@@ -363,9 +363,10 @@ hackageDistro planFile target = withManager tlsManagerSettings $ \man -> do
 
 uploadGithub
     :: FilePath -- ^ plan file
+    -> FilePath -- ^ docmap file
     -> Target
     -> IO ()
-uploadGithub planFile target = do
+uploadGithub planFile docmapFile target = do
     let repoUrl =
             case target of
                 TargetNightly _ -> "git@github.com:fpco/stackage-nightly"
@@ -380,20 +381,23 @@ uploadGithub planFile target = do
                 TargetNightly _ -> root </> "stackage-nightly"
                 TargetLts _ _ -> root </> "lts-haskell"
 
-        destFP =
+        name =
             case target of
-                TargetNightly day -> repoDir </> (fpFromString $ concat
+                TargetNightly day -> fpFromString $ concat
                     [ "nightly-"
                     , show day
                     , ".yaml"
-                    ])
-                TargetLts x y -> repoDir </> (fpFromString $ concat
+                    ]
+                TargetLts x y -> fpFromString $ concat
                     [ "lts-"
                     , show x
                     , "."
                     , show y
                     , ".yaml"
-                    ])
+                    ]
+
+        destFPPlan = repoDir </> name
+        destFPDocmap = repoDir </> "docs" </> name
 
         runIn wdir cmd args = do
             putStrLn $ concat
@@ -417,9 +421,12 @@ uploadGithub planFile target = do
             createTree $ parent repoDir
             runIn "." "git" ["clone", repoUrl, fpToString repoDir]
 
-    runResourceT $ sourceFile planFile $$ (sinkFile destFP :: Sink ByteString (ResourceT IO) ())
-    git ["add", fpToString destFP]
-    git ["commit", "-m", "Checking in " ++ fpToString (filename destFP)]
+    createTree $ parent destFPDocmap
+    runResourceT $ do
+        sourceFile planFile $$ (sinkFile destFPPlan :: Sink ByteString (ResourceT IO) ())
+        sourceFile docmapFile $$ (sinkFile destFPDocmap :: Sink ByteString (ResourceT IO) ())
+    git ["add", fpToString destFPPlan, fpToString destFPDocmap]
+    git ["commit", "-m", "Checking in " ++ fpToString name]
     git ["push", "origin", "HEAD:master"]
 
 upload
@@ -457,6 +464,7 @@ installDest target =
 
 makeBundle
     :: FilePath -- ^ plan file
+    -> FilePath -- ^ docmap file
     -> FilePath -- ^ bundle file
     -> Target
     -> Maybe Int -- ^ jobs
@@ -469,7 +477,7 @@ makeBundle
     -> Bool -- ^ allow-newer?
     -> IO ()
 makeBundle
-  planFile bundleFile target mjobs skipTests skipHaddocks skipHoogle
+  planFile docmapFile bundleFile target mjobs skipTests skipHaddocks skipHoogle
   enableLibraryProfiling enableExecutableDynamic verbose allowNewer
         = do
     plan <- decodeFileEither (fpToString planFile) >>= either throwM return
@@ -505,6 +513,7 @@ makeBundle
                 TargetLts x y -> STLTS x y
         , cb2DocsDir = pbDocDir pb
         , cb2Dest = bundleFile
+        , cb2DocmapFile = docmapFile
         }
 
 fetch :: FilePath -> IO ()

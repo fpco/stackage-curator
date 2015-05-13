@@ -56,7 +56,7 @@ main = do
         addCommand "hackage-distro" "Update the Hackage distro list" id
             (hackageDistro <$> planFile <*> target)
         addCommand "upload-github" "Upload a plan to the relevant Github repo" id
-            (uploadGithub <$> planFile <*> target)
+            (uploadGithub <$> planFile <*> docmapFile <*> target)
         addCommand "install" "Install a snapshot from an existing build plan" id
             (installBuild <$> installFlags)
         addCommand "stats" "Print statistics on a build plan" id
@@ -68,6 +68,7 @@ main = do
 
     makeBundle' = makeBundle
         <$> planFile
+        <*> docmapFile
         <*> bundleFile
         <*> target
         <*> jobs
@@ -215,6 +216,12 @@ main = do
          ( metavar "YAML-FILE"
         ++ long "plan-file"
         ++ help "YAML file containing a build plan"
+         )
+
+    docmapFile = fmap decodeString $ strOption
+         ( metavar "YAML-FILE"
+        ++ long "docmap-file"
+        ++ help "YAML file containing the docmap (list of all generated Haddock modules)"
          )
 
     planFileArg = fmap decodeString $ strArgument

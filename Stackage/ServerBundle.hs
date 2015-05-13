@@ -130,6 +130,7 @@ data CreateBundleV2 = CreateBundleV2
     , cb2Type :: SnapshotType
     , cb2DocsDir :: FilePath
     , cb2Dest :: FilePath
+    , cb2DocmapFile :: !FilePath
     }
 
 -- | Create a V2 bundle, which contains the build plan, metadata, docs, and doc
@@ -142,6 +143,7 @@ createBundleV2 CreateBundleV2 {..} = do
     Y.encodeFile (fpToString $ docsDir </> "build-plan.yaml") cb2Plan
     Y.encodeFile (fpToString $ docsDir </> "build-type.yaml") cb2Type
     Y.encodeFile (fpToString $ docsDir </> "docs-map.yaml") docMap
+    Y.encodeFile (fpToString cb2DocmapFile) docMap
     void $ writeIndexStyle Nothing cb2DocsDir
 
     currentDir <- getWorkingDirectory
