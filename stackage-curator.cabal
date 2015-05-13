@@ -50,7 +50,7 @@ library
                      , utf8-string
 
                      , conduit-extra
-                     , classy-prelude-conduit
+                     , classy-prelude-conduit < 0.12
                      , text
                      , system-fileio
                      , system-filepath
@@ -68,7 +68,7 @@ library
                      , async
                      , streaming-commons >= 0.1.7.1
                      , semigroups
-                     , xml-conduit
+                     , xml-conduit < 1.3
                      , conduit
                      , stackage-types >= 1.0.1
                      , monad-unlift >= 0.1.1
