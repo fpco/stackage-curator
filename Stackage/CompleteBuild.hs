@@ -445,14 +445,17 @@ upload bundleFile server = withManager tlsManagerSettings $ \man -> do
         }
     putStrLn $ "New snapshot available at: " ++ res
 
-uploadDocs' :: Target -> IO ()
-uploadDocs' target = do
+uploadDocs' :: Target
+            -> FilePath -- ^ bundle file
+            -> IO ()
+uploadDocs' target bundleFile = do
     name <-
         case target of
             TargetNightly day -> return $ "nightly-" ++ tshow day
             TargetLts x y -> return $ concat ["lts-", tshow x, ".", tshow y]
     uploadDocs
         (installDest target </> "doc")
+        bundleFile
         name
         "haddock.stackage.org"
 
