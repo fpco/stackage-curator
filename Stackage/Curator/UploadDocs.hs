@@ -5,6 +5,7 @@
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE RankNTypes            #-}
 {-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE ViewPatterns          #-}
 -- | Upload Haddock documentation to S3.
 module Stackage.Curator.UploadDocs
     ( uploadDocs
@@ -23,6 +24,7 @@ import           Data.Conduit.Zlib             (WindowBits (WindowBits),
                                                 compress)
 import           Data.XML.Types                (Content (ContentText), Event (EventBeginDoctype, EventEndDoctype, EventBeginElement),
                                                 Name)
+import           Distribution.Package          (PackageIdentifier (..))
 import qualified Filesystem                    as F
 import qualified Filesystem.Path.CurrentOS     as F
 import           Network.AWS                   (Credentials (Discover), Env,
@@ -34,6 +36,7 @@ import           Network.AWS.S3                (ObjectCannedACL (PublicRead),
                                                 poContentEncoding,
                                                 poContentType, putObject)
 import           Network.Mime                  (defaultMimeLookup)
+import           Stackage.Types                (simpleParse)
 import           Text.Blaze.Html               (toHtml)
 import           Text.Blaze.Html.Renderer.Utf8 (renderHtml)
 import           Text.HTML.DOM                 (eventConduit)
@@ -95,13 +98,23 @@ upload' name src = do
     (env, bucket) <- ask
     liftResourceT $ src $$ upload env bucket name
 
+isHoogleFile :: FilePath -> FilePath -> Bool
+isHoogleFile input fp' = fromMaybe False $ do
+    fp <- F.stripPrefix input fp'
+    [dir, name] <- Just $ F.splitDirectories fp
+    pkgver <- stripSuffix "/" $ fpToText dir
+    (fpToText -> pkg, ["txt"]) <- Just $ F.splitExtensions name
+    PackageIdentifier pkg1 _ver <- simpleParse pkgver
+    pkg2 <- simpleParse pkg
+    return $ pkg1 == pkg2
+
 go :: M m
    => FilePath -- ^ prefix for all input
    -> Text -- ^ upload name
    -> FilePath -- ^ current file
    -> m ()
 go input name fp
-    | hasExtension fp "txt" = tell $! singletonSet fp
+    | isHoogleFile input fp = tell $! singletonSet fp
     | hasExtension fp "html" = do
         doc <- sourceFile fp
             $= eventConduit
