@@ -25,6 +25,7 @@ import Network.HTTP.Client (withManager)
 import Network.HTTP.Client.TLS (tlsManagerSettings)
 import qualified Data.Text as T
 import System.IO (hSetBuffering, stdout, BufferMode (LineBuffering))
+import Stackage.Curator.UploadIndex
 
 main :: IO ()
 main = do
@@ -65,6 +66,12 @@ main = do
             (printStats <$> planFile)
         addCommand "diff" "Show the high-level differences between two build plans" id
             (diffPlans <$> planFileArg <*> planFileArg)
+        addCommand "upload-index" "Upload the 00-index.tar.gz file to S3" id
+            (uploadIndex
+                <$> planFile
+                <*> target
+                <*> pure (T.pack "haddock.stackage.org")
+                <*> pure (T.pack "package-index/"))
         addCommand "upload-docs" "Upload documentation to an S3 bucket" id
             (uploadDocs' <$> target <*> bundleFile)
 

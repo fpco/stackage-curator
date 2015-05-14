@@ -9,6 +9,7 @@
 -- | Upload Haddock documentation to S3.
 module Stackage.Curator.UploadDocs
     ( uploadDocs
+    , upload
     ) where
 import           ClassyPrelude.Conduit
 import qualified Codec.Archive.Tar             as Tar
@@ -43,17 +44,23 @@ import           Text.HTML.DOM                 (eventConduit)
 import           Text.XML                      (fromEvents)
 
 upload :: (MonadResource m)
-       => Env
+       => Bool -- ^ compression?
+       -> Env
        -> Text
        -> Text
        -> Consumer ByteString m ()
-upload env bucket name = do
+upload toCompress env bucket name = do
     let mime = defaultMimeLookup name
 
-    body <- compress 9 (WindowBits 31) =$= sinkLazy
+    body <-
+        if toCompress
+            then compress 9 (WindowBits 31) =$= sinkLazy
+            else sinkLazy
 
     let po = set poContentType (Just $ decodeUtf8 mime)
-           $ set poContentEncoding (Just "gzip")
+           $ (if toCompress
+                then set poContentEncoding (Just "gzip")
+                else id)
            $ set poCacheControl (Just "maxage=31536000")
            $ set poACL (Just PublicRead)
            $ putObject (toBody body) bucket name
@@ -81,8 +88,8 @@ uploadDocs input' bundleFile name bucket = do
 
         lbs <- liftIO $ fmap Tar.write $ mapM toEntry $ toList hoogles
         flip runReaderT (env, bucket) $ do
-            upload' (name ++ "/hoogle/orig.tar") $ sourceLazy lbs
-            upload' (name ++ "/bundle.tar.xz") $ sourceFile bundleFile
+            upload' True (name ++ "/hoogle/orig.tar") $ sourceLazy lbs
+            upload' False (name ++ "/bundle.tar.xz") $ sourceFile bundleFile
 
 -- | Create a TAR entry for each Hoogle txt file. Unfortunately doesn't stream.
 toEntry :: FilePath -> IO Tar.Entry
@@ -91,12 +98,13 @@ toEntry fp = do
     Tar.packFileEntry (fpToString fp) tp
 
 upload' :: (MonadResource m, MonadReader (Env, Text) m)
-        => Text -- ^ S3 key
+        => Bool -- ^ compress?
+        -> Text -- ^ S3 key
         -> Source (ResourceT IO) ByteString
         -> m ()
-upload' name src = do
+upload' toCompress name src = do
     (env, bucket) <- ask
-    liftResourceT $ src $$ upload env bucket name
+    liftResourceT $ src $$ upload toCompress env bucket name
 
 isHoogleFile :: FilePath -> FilePath -> Bool
 isHoogleFile input fp' = fromMaybe False $ do
@@ -129,9 +137,9 @@ go input name fp
 
         -- Sink to a Document and then use blaze-html to render to avoid using
         -- XML rendering rules (e.g., empty elements)
-        upload' key $ sourceLazy (renderHtml $ toHtml doc)
+        upload' True key $ sourceLazy (renderHtml $ toHtml doc)
     | any (hasExtension fp) $ words "css js png svg gif" = void $ getName fp
-    | otherwise = upload' key $ sourceFile fp
+    | otherwise = upload' True key $ sourceFile fp
   where
     Just suffix = F.stripPrefix input fp
     toRoot = concat $ asList $ replicate (length $ F.splitDirectories suffix) $ asText "../"
@@ -189,7 +197,7 @@ toHash src = do
     (m, s) <- get
     unless (name `member` s) $ do
         put (m, insertSet name s)
-        upload' name $ sourceLazy lbs
+        upload' True name $ sourceLazy lbs
     return name
   where
     sink = getZipSink $ (,)

@@ -73,3 +73,7 @@ copyDir src dest =
 data Target = TargetNightly !Day
             | TargetLts !Int !Int
     deriving Show
+
+targetSlug :: Target -> Text
+targetSlug (TargetNightly day) = "nightly-" ++ tshow day
+targetSlug (TargetLts x y) = concat ["lts-", tshow x, ".", tshow y]
