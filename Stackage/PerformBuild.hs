@@ -342,7 +342,9 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} =
         tell' $ "--libdir=" ++ fpToText (pbLibDir pb)
         tell' $ "--bindir=" ++ fpToText (pbBinDir pb)
         tell' $ "--datadir=" ++ fpToText (pbDataDir pb)
-        tell' $ "--docdir=" ++ fpToText (pbDocDir pb)
+        tell' $ "--docdir=" ++ fpToText (pbDocDir pb </> fpFromText namever)
+        tell' $ "--htmldir=" ++ fpToText (pbDocDir pb </> fpFromText namever)
+        tell' $ "--haddockdir=" ++ fpToText (pbDocDir pb </> fpFromText namever)
         tell' $ "--flags=" ++ flags
         when (pbEnableLibProfiling && pcEnableLibProfile) $
             tell' "--enable-library-profiling"
