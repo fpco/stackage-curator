@@ -65,7 +65,7 @@ main = do
         addCommand "stats" "Print statistics on a build plan" id
             (printStats <$> planFile)
         addCommand "diff" "Show the high-level differences between two build plans" id
-            (diffPlans <$> planFileArg <*> planFileArg)
+            (diffPlans <$> planFileArg <*> planFileArg <*> diffsOnly <*> useColor)
         addCommand "upload-index" "Upload the 00-index.tar.gz file to S3" id
             (uploadIndex
                 <$> planFile
@@ -262,3 +262,13 @@ main = do
         case simpleParse $ T.pack s of
             Nothing -> fail $ "Invalid constraint: " ++ s
             Just d -> return d
+
+    diffsOnly =
+        switch
+            (long "diffsOnly" <> short 'd' <>
+             help "Show changed packages only")
+
+    useColor =
+        switch
+            (long "useColor" <> short 'c' <>
+             help "Show differences in color")
