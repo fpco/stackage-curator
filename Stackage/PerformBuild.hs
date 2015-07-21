@@ -387,6 +387,7 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} =
         prevBuildResult <- getPreviousResult pb Build pident
         toBuild <- case () of
             ()
+                | pcSkipBuild -> return False
                 | prevBuildResult /= PRSuccess -> return True
                 | pname `notMember` registeredPackages && hasLib -> do
                     log' $ concat
@@ -421,6 +422,7 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} =
         let needHaddock = pbEnableHaddock
                        && checkPrevResult prevHaddockResult pcHaddocks
                        && not (null $ sdModules $ ppDesc $ piPlan sbPackageInfo)
+                       && not pcSkipBuild
         when needHaddock $ withConfiged $ do
             log' $ "Haddocks " ++ namever
             hfs <- readTVarIO sbHaddockFiles
@@ -479,6 +481,7 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} =
         prevTestResult <- getPreviousResult pb Test pident
         let needTest = pbEnableTests
                     && checkPrevResult prevTestResult pcTests
+                    && not pcSkipBuild
         when needTest $ withUnpacked $ do
             log' $ "Test configure " ++ namever
             run "cabal" $ "configure" : "--enable-tests" : configArgs

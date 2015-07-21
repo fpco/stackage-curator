@@ -1,3 +1,7 @@
+## 0.10.0
+
+* Added `pcSkipBuild`
+
 ## 0.8.2
 
 * `upload-docs` command
