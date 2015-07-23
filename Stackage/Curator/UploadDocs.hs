@@ -104,7 +104,16 @@ upload' :: (MonadResource m, MonadReader (Env, Text) m)
         -> m ()
 upload' toCompress name src = do
     (env, bucket) <- ask
-    liftResourceT $ src $$ upload toCompress env bucket name
+    let loop i = do
+            eres <- liftResourceT $ tryAny $ src $$ upload toCompress env bucket name
+            case eres of
+                Left e
+                    | i <= 0 -> throwIO e
+                    | otherwise -> do
+                        putStrLn $ "Exception, retrying: " ++ tshow e
+                        loop $! i - 1
+                Right () -> return ()
+    loop 3
 
 isHoogleFile :: FilePath -> FilePath -> Bool
 isHoogleFile input fp' = fromMaybe False $ do
