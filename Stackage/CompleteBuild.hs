@@ -43,6 +43,7 @@ import Stackage.ServerBundle
 import Stackage.UpdateBuildPlan
 import Stackage.Upload
 import System.Environment        (lookupEnv)
+import Filesystem.Path           (dropExtension)
 import System.IO                 (BufferMode (LineBuffering), hSetBuffering)
 import Control.Monad.Trans.Unlift (askRunBase, MonadBaseUnlift)
 import Data.Function (fix)
@@ -437,7 +438,7 @@ uploadGithub planFile docmapFile target = do
         sourceFile docmapFile $$ (sinkFile destFPDocmap :: Sink ByteString (ResourceT IO) ())
 
     git ["add", fpToString destFPPlan, fpToString destFPDocmap]
-    git ["commit", "-m", "Checking in " ++ fpToString (basename destFPPlan)]
+    git ["commit", "-m", "Checking in " ++ fpToString (dropExtension destFPPlan)]
     git ["push", "origin", "HEAD:master"]
 
 upload
