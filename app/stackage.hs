@@ -1,31 +1,30 @@
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude, TemplateHaskell, TupleSections #-}
 
 module Main where
 
+import           Control.Monad
+import           Data.String                  (fromString)
+import           Data.Text                    (pack, stripPrefix)
+import qualified Data.Text                    as T
+import           Data.Text.Read               (decimal)
+import           Data.Version
+import           Filesystem.Path.CurrentOS    (decodeString)
+import           Network.HTTP.Client          (withManager)
+import           Network.HTTP.Client.TLS      (tlsManagerSettings)
+import           Options.Applicative
+import           Paths_stackage_curator       (version)
 import qualified Prelude
-import Control.Monad
-import Data.String (fromString)
-import Data.Version
-import Data.Text (pack, stripPrefix)
-import Data.Text.Read (decimal)
-import Options.Applicative
-import Filesystem.Path.CurrentOS (decodeString)
-import Paths_stackage_curator (version)
-import Stackage.CLI
-import Stackage.CompleteBuild
-import Stackage.DiffPlans
-import Stackage.Upload
-import Stackage.Update
-import Stackage.InstallBuild
-import Stackage.Prelude hiding ((<>))
-import Stackage.Stats
-import Network.HTTP.Client (withManager)
-import Network.HTTP.Client.TLS (tlsManagerSettings)
-import qualified Data.Text as T
-import System.IO (hSetBuffering, stdout, BufferMode (LineBuffering))
-import Stackage.Curator.UploadIndex
+import           Stackage.CLI
+import           Stackage.CompleteBuild
+import           Stackage.Curator.UploadIndex
+import           Stackage.DiffPlans
+import           Stackage.InstallBuild
+import           Stackage.Prelude             hiding ((<>))
+import           Stackage.Stats
+import           Stackage.Update
+import           Stackage.Upload
+import           System.IO                    (BufferMode (LineBuffering), hSetBuffering,
+                                               stdout)
 
 main :: IO ()
 main = do
@@ -65,7 +64,8 @@ main = do
         addCommand "stats" "Print statistics on a build plan" id
             (printStats <$> planFile)
         addCommand "diff" "Show the high-level differences between two build plans" id
-            (diffPlans <$> planFileArg <*> planFileArg)
+            (diffPlans <$> planFileArg <*> planFileArg
+                       <*> diffsOnly <*> useColor <*> githubFetch <*> html)
         addCommand "upload-index" "Upload the 00-index.tar.gz file to S3" id
             (uploadIndex
                 <$> planFile
@@ -262,3 +262,23 @@ main = do
         case simpleParse $ T.pack s of
             Nothing -> fail $ "Invalid constraint: " ++ s
             Just d -> return d
+
+    diffsOnly =
+        switch
+            (long "diffsOnly" <> short 'd' <>
+             help "Show changed packages only")
+
+    useColor =
+        switch
+            (long "useColor" <> short 'c' <>
+             help "Show differences in color")
+
+    githubFetch =
+        switch
+            (long "githubFetch" <> short 'g' <>
+             help "Fetch YAML files from GitHub")
+
+    html =
+        switch
+            (long "html" <> short 'h' <>
+             help "Wrap the output in HTML <ul>/<li> tags")
