@@ -119,13 +119,18 @@ getLatestDescriptions :: MonadIO m
                       -> (GenericPackageDescription -> IO desc)
                       -> m (Map PackageName desc)
 getLatestDescriptions f parseDesc = liftIO $ do
-    m <- runResourceT $ sourcePackageIndex $$ filterC f' =$ foldlC add mempty
-    forM m $ \ucf -> liftIO $ ucfParse ucf >>= parseDesc
+    -- Parse twice to avoid keeping stuff in memory: once to determine which
+    -- versions to keep, once to do the actual parsing.
+    liftIO $ putStrLn "Determining target package versions"
+    mvers <- runResourceT $ sourcePackageIndex $$ filterC f' =$ flip foldlC mempty
+        (\m ucf -> insertWith max (ucfName ucf) (ucfVersion ucf) m)
+    liftIO $ putStrLn "Parsing package descriptions"
+    runResourceT $ sourcePackageIndex $$ flip foldMC mempty
+        (\m ucf ->
+            if lookup (ucfName ucf) (asMap mvers) == Just (ucfVersion ucf)
+                then do
+                    desc <- liftIO $ ucfParse ucf >>= parseDesc
+                    return $! insertMap (ucfName ucf) desc m
+                else return m)
   where
     f' ucf = f (ucfName ucf) (ucfVersion ucf)
-    add m ucf =
-        case lookup name m of
-            Just ucf' | ucfVersion ucf < ucfVersion ucf' -> m
-            _ -> insertMap name ucf m
-      where
-        name = ucfName ucf
