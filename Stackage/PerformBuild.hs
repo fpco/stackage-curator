@@ -19,21 +19,21 @@ import           Control.Monad.Writer.Strict (execWriter, tell)
 import qualified Data.Map                    as Map
 import           Data.NonNull                (fromNullable)
 import           Filesystem                  (canonicalizePath, createTree,
-                                              getWorkingDirectory, isDirectory,
-                                              removeTree, rename, isFile, removeFile)
+                                              getWorkingDirectory,
+                                              removeTree, rename, removeFile)
 import           Filesystem.Path             (parent)
-import qualified Filesystem.Path             as F
+import qualified Filesystem.Path.CurrentOS   as F
 import           Stackage.BuildConstraints
 import           Stackage.BuildPlan
 import           Stackage.GhcPkg
 import           Stackage.PackageDescription
 import           Stackage.Prelude            hiding (pi)
-import           System.Directory            (findExecutable)
+import           System.Directory            (doesDirectoryExist, doesFileExist, findExecutable)
+import qualified System.FilePath             as FP
 import           System.Environment          (getEnvironment)
 import           System.IO                   (IOMode (WriteMode),
                                               openBinaryFile)
 import           System.IO.Temp              (withSystemTempDirectory)
-import Data.Yaml (decodeFileEither)
 
 data BuildException = BuildException (Map PackageName BuildFailure) [Text]
     deriving Typeable
@@ -150,19 +150,19 @@ performBuild :: PerformBuild -> IO [Text]
 performBuild pb = do
     cwd <- getWorkingDirectory
     performBuild' pb
-        { pbInstallDest = cwd </> pbInstallDest pb
-        , pbLogDir = cwd </> pbLogDir pb
+        { pbInstallDest = F.encodeString cwd </> pbInstallDest pb
+        , pbLogDir = F.encodeString cwd </> pbLogDir pb
         }
 
 performBuild' :: PerformBuild -> IO [Text]
 performBuild' pb@PerformBuild {..} = withBuildDir $ \builddir -> do
-    let removeTree' fp = whenM (isDirectory fp) (removeTree fp)
-    removeTree' pbLogDir
+    let removeTree' fp = whenM (doesDirectoryExist fp) (removeTree $ fromString fp)
+    removeTree' $ fromString pbLogDir
 
     forM_ (pbDatabase pb) $ \db ->
-        unlessM (isFile $ db </> "package.cache") $ do
-            createTree $ parent db
-            withCheckedProcess (proc "ghc-pkg" ["init", fpToString db])
+        unlessM (doesFileExist $ db </> "package.cache") $ do
+            createTree $ parent $ fromString db
+            withCheckedProcess (proc "ghc-pkg" ["init", db])
                 $ \ClosedStream Inherited Inherited -> return ()
     pbLog $ encodeUtf8 "Copying built-in Haddocks\n"
     copyBuiltInHaddocks (pbDocDir pb)
@@ -206,7 +206,7 @@ performBuild' pb@PerformBuild {..} = withBuildDir $ \builddir -> do
         , sbRegisterMutex = mutex
         , sbModifiedEnv = maybe
             id
-            (\db -> (("HASKELL_PACKAGE_SANDBOX", fpToString db):))
+            (\db -> (("HASKELL_PACKAGE_SANDBOX", db):))
             (pbDatabase pb)
             (filter allowedEnv $ map fixEnv env)
         , sbHaddockFiles = haddockFiles
@@ -220,11 +220,11 @@ performBuild' pb@PerformBuild {..} = withBuildDir $ \builddir -> do
     when (not $ null errs) $ throwM $ BuildException errs warnings
     return warnings
   where
-    withBuildDir f = withSystemTempDirectory "stackage-build" (f . fpFromString)
+    withBuildDir f = withSystemTempDirectory "stackage-build" f
 
     fixEnv (p, x)
         -- Thank you Windows having case-insensitive environment variables...
-        | toUpper p == "PATH" = (p, fpToString (pbBinDir pb) ++ pathSep : x)
+        | toUpper p == "PATH" = (p, pbBinDir pb ++ pathSep : x)
         | otherwise = (p, x)
 
     allowedEnv (k, _) = k `notMember` bannedEnvs
@@ -293,14 +293,14 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} =
             (return () :: IO ())
       where
         cp outH = (proc (unpack $ asText cmd) (map (unpack . asText) args))
-            { cwd = Just $ fpToString wdir
+            { cwd = Just wdir
             , std_out = UseHandle outH
             , std_err = UseHandle outH
             , env = Just sbModifiedEnv
             }
     runParent = runIn sbBuildDir
     runChild = runIn childDir
-    childDir = sbBuildDir </> fpFromText namever
+    childDir = sbBuildDir </> unpack namever
 
     log' t = do
         i <- readTVarIO sbActive
@@ -313,9 +313,9 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} =
             , tshow $ length errs
             , ")\n"
             ]
-    libOut = pbLogDir </> fpFromText namever </> "build.out"
-    testOut = pbLogDir </> fpFromText namever </> "test.out"
-    testRunOut = pbLogDir </> fpFromText namever </> "test-run.out"
+    libOut = pbLogDir </> unpack namever </> "build.out"
+    testOut = pbLogDir </> unpack namever </> "test.out"
+    testRunOut = pbLogDir </> unpack namever </> "test-run.out"
 
     wf fp inner' = do
         ref <- newIORef Nothing
@@ -327,8 +327,8 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} =
                 case mh of
                     Just h -> return h
                     Nothing -> mask_ $ do
-                        createTree $ parent fp
-                        h <- openBinaryFile (fpToString fp) WriteMode
+                        createTree $ parent $ fromString fp
+                        h <- openBinaryFile fp WriteMode
                         writeIORef ref $ Just h
                         return h
 
@@ -338,13 +338,13 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} =
         when pbAllowNewer $ tell' "--allow-newer"
         tell' "--package-db=clear"
         tell' "--package-db=global"
-        forM_ (pbDatabase pb) $ \db -> tell' $ "--package-db=" ++ fpToText db
-        tell' $ "--libdir=" ++ fpToText (pbLibDir pb)
-        tell' $ "--bindir=" ++ fpToText (pbBinDir pb)
-        tell' $ "--datadir=" ++ fpToText (pbDataDir pb)
-        tell' $ "--docdir=" ++ fpToText (pbDocDir pb </> fpFromText namever)
-        tell' $ "--htmldir=" ++ fpToText (pbDocDir pb </> fpFromText namever)
-        tell' $ "--haddockdir=" ++ fpToText (pbDocDir pb </> fpFromText namever)
+        forM_ (pbDatabase pb) $ \db -> tell' $ "--package-db=" ++ pack db
+        tell' $ "--libdir=" ++ pack (pbLibDir pb)
+        tell' $ "--bindir=" ++ pack (pbBinDir pb)
+        tell' $ "--datadir=" ++ pack (pbDataDir pb)
+        tell' $ "--docdir=" ++ pack (pbDocDir pb </> unpack namever)
+        tell' $ "--htmldir=" ++ pack (pbDocDir pb </> unpack namever)
+        tell' $ "--haddockdir=" ++ pack (pbDocDir pb </> unpack namever)
         tell' $ "--flags=" ++ flags
         when (pbEnableLibProfiling && pcEnableLibProfile) $
             tell' "--enable-library-profiling"
@@ -369,20 +369,20 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} =
                          runChild getOutH a b
 
         isUnpacked <- newIORef False
-        let withUnpacked inner = do
+        let withUnpacked inner' = do
                 unlessM (readIORef isUnpacked) $ do
                     log' $ "Unpacking " ++ namever
                     runParent getOutH "cabal" ["unpack", namever]
                     writeIORef isUnpacked True
-                inner
+                inner'
 
         isConfiged <- newIORef False
-        let withConfiged inner = withUnpacked $ do
+        let withConfiged inner' = withUnpacked $ do
                 unlessM (readIORef isConfiged) $ do
                     log' $ "Configuring " ++ namever
                     run "cabal" $ "configure" : configArgs
                     writeIORef isConfiged True
-                inner
+                inner'
 
         prevBuildResult <- getPreviousResult pb Build pident
         toBuild <- case () of
@@ -439,7 +439,7 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} =
                     , "../"
                     , pkgVer
                     , "/,"
-                    , fpToText hf
+                    , pack hf
                     ]
                 args = ($ hfsOpts) $ execWriter $ do
                         let tell' x = tell (x:)
@@ -453,19 +453,20 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} =
 
             forM_ eres $ \() -> do
                 renameOrCopy
-                    (childDir </> "dist" </> "doc" </> "html" </> fpFromText name)
-                    (pbDocDir pb </> fpFromText namever)
+                    (childDir </> "dist" </> "doc" </> "html" </> unpack name)
+                    (pbDocDir pb </> unpack namever)
 
                 enewPath <- tryIO
                           $ canonicalizePath
+                          $ fromString
                           $ pbDocDir pb
-                        </> fpFromText namever
-                        </> fpFromText name <.> "haddock"
+                        </> unpack namever
+                        </> unpack name <.> "haddock"
                 case enewPath of
                     Left e -> warn $ tshow e
                     Right newPath -> atomically
                                    $ modifyTVar sbHaddockFiles
-                                   $ insertMap namever newPath
+                                   $ insertMap namever (F.encodeString newPath)
 
             savePreviousResult pb Haddock pident $ either (const False) (const True) eres
             case (eres, pcHaddocks) of
@@ -491,7 +492,7 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} =
                 run "cabal" ["build"]
 
                 log' $ "Test run " ++ namever
-                run "cabal" ["test", "--log=" ++ fpToText testRunOut]
+                run "cabal" ["test", "--log=" ++ pack testRunOut]
 
             savePreviousResult pb Test pident $ either (const False) (const True) eres
             case (eres, pcTests) of
@@ -515,7 +516,9 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} =
                 Nothing -> BuildFailureException exc
 
 renameOrCopy :: FilePath -> FilePath -> IO ()
-renameOrCopy src dest = rename src dest `catchIO` \_ -> copyDir src dest
+renameOrCopy src dest =
+    rename (fromString src) (fromString dest)
+    `catchIO` \_ -> copyDir src dest
 
 copyBuiltInHaddocks :: FilePath -> IO ()
 copyBuiltInHaddocks docdir = do
@@ -523,9 +526,9 @@ copyBuiltInHaddocks docdir = do
     case mghc of
         Nothing -> error "GHC not found on PATH"
         Just ghc -> do
-            src <- canonicalizePath
-                (parent (fpFromString ghc) </> "../share/doc/ghc/html/libraries")
-            copyDir src docdir
+            src <- canonicalizePath $ fromString
+                (F.encodeString (parent (fromString ghc)) </> "../share/doc/ghc/html/libraries")
+            copyDir (F.encodeString src) docdir
 
 ------------- Previous results
 
@@ -547,10 +550,10 @@ checkPrevResult PRFailure  _             = False
 
 withPRPath :: PerformBuild -> ResultType -> PackageIdentifier -> (FilePath -> IO a) -> IO a
 withPRPath pb rt ident inner = do
-    createTree $ parent fp
+    createTree $ parent $ fromString fp
     inner fp
   where
-    fp = pbPrevResDir pb </> fpFromString (show rt) </> fpFromText (display ident)
+    fp = pbPrevResDir pb </> show rt </> unpack (display ident)
 
 successBS, failureBS :: ByteString
 successBS = "success"
@@ -574,7 +577,7 @@ deletePreviousResults :: PerformBuild -> PackageIdentifier -> IO ()
 deletePreviousResults pb name =
     forM_ [minBound..maxBound] $ \rt ->
     withPRPath pb rt name $ \fp ->
-    void $ tryIO $ removeFile fp
+    void $ tryIO $ removeFile $ fromString fp
 
 -- | Discover existing .haddock files in the docs directory
 getHaddockFiles :: PerformBuild -> IO (Map Text FilePath)
@@ -587,14 +590,14 @@ getHaddockFiles pb =
     go dir =
         case simpleParse nameVerText of
             Nothing -> return mempty
-            Just pi@(PackageIdentifier (PackageName name) _) -> do
-                let fp = dir </> fpFromString name <.> "haddock"
-                exists <- isFile fp
+            Just (PackageIdentifier (PackageName name) _) -> do
+                let fp = dir </> name <.> "haddock"
+                exists <- doesFileExist fp
                 return $ if exists
                     then singletonMap nameVerText fp
                     else mempty
       where
-        nameVerText = fpToText $ filename dir
+        nameVerText = pack $ FP.takeFileName dir
 
 getHaddockDeps :: BuildPlan
                -> TVar (Map PackageName (Set PackageName))

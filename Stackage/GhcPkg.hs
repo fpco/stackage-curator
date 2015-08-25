@@ -11,15 +11,11 @@ import qualified Data.Conduit.List as CL
 import           Data.Conduit.Process
 import qualified Data.Conduit.Text as CT
 import           Data.Maybe
-import           Data.Text (Text)
 import qualified Data.Text as T
 import           Distribution.Compat.ReadP
 import           Distribution.Package
 import           Distribution.Text (parse)
-import           Filesystem.Path.CurrentOS (FilePath)
 import qualified Filesystem.Path.CurrentOS as FP
-import Data.Map (Map)
-import Data.Version (Version)
 import Stackage.Prelude
 import Filesystem (removeTree)
 
@@ -32,9 +28,9 @@ setupPackageDatabase
     -> IO (Set PackageName) -- ^ packages remaining in the database after cleanup
 setupPackageDatabase mdb docDir log' toInstall onUnregister = do
     registered1 <- getRegisteredPackages flags
-    forM_ registered1 $ \pi@(PackageIdentifier name version) ->
+    forM_ registered1 $ \pi'@(PackageIdentifier name version) ->
         case lookup name toInstall of
-            Just version' | version /= version' -> unregisterPackage log' onUnregister docDir flags pi
+            Just version' | version /= version' -> unregisterPackage log' onUnregister docDir flags pi'
             _ -> return ()
     broken <- getBrokenPackages flags
     forM_ broken $ unregisterPackage log' onUnregister docDir flags
@@ -48,7 +44,7 @@ ghcPkgFlags mdb =
     "--no-user-package-db" :
     case mdb of
         Nothing -> ["--global"]
-        Just fp -> ["--package-db=" ++ fpToString fp]
+        Just fp -> ["--package-db=" ++ fp]
 
 -- | Get broken packages.
 getBrokenPackages :: [String] -> IO [PackageIdentifier]
@@ -87,18 +83,18 @@ unregisterPackage log' onUnregister docDir flags ident@(PackageIdentifier name _
     onUnregister ident
 
     -- Delete libraries
-    sourceProcessWithConsumer
+    (_exitCode, ()) <- sourceProcessWithConsumer
         (proc "ghc-pkg" ("describe" : flags ++ [unpack $ display ident]))
         (CT.decodeUtf8
          $= CT.lines
          $= CL.mapMaybe parseLibraryDir
-         $= CL.mapM_ (void . tryIO . removeTree))
+         $= CL.mapM_ (void . tryIO . removeTree . FP.decodeString))
 
     void (readProcessWithExitCode
               "ghc-pkg"
               ("unregister": flags ++ ["--force", unpack $ display name])
               "")
 
-    void $ tryIO $ removeTree $ docDir </> fpFromText (display ident)
+    void $ tryIO $ removeTree $ FP.decodeString $ docDir </> unpack (display ident)
   where
-    parseLibraryDir = fmap fpFromText . stripPrefix "library-dirs: "
+    parseLibraryDir = fmap unpack . stripPrefix "library-dirs: "

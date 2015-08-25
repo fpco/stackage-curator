@@ -9,7 +9,7 @@ import Data.Yaml (decodeFileEither)
 printStats :: FilePath -- ^ YAML build plan file
            -> IO ()
 printStats fp = do
-    bp <- decodeFileEither (fpToString fp) >>= either throwIO return
+    bp <- decodeFileEither fp >>= either throwIO return
     let core = length $ siCorePackages $ bpSystemInfo bp
         pkgs = length $ bpPackages bp
         maintainers = length $ asSet $ flip foldMap (bpPackages bp)

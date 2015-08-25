@@ -39,11 +39,11 @@ getPackageIndexPath = liftIO $ do
         _ -> error $ "Multiple remote-repo-cache entries found in Cabal config file"
   where
     getCabalRoot :: IO FilePath
-    getCabalRoot = fpFromString <$> getAppUserDataDirectory "cabal"
+    getCabalRoot = getAppUserDataDirectory "cabal"
 
     getRemoteCache s = do
         ("remote-repo-cache", stripPrefix ":" -> Just v) <- Just $ break (== ':') s
-        Just $ fpFromText $ T.strip v
+        Just $ unpack $ T.strip v
 
 -- | A cabal file with name and version parsed from the filepath, and the
 -- package description itself ready to be parsed. It's left in unparsed form
@@ -81,12 +81,12 @@ sourcePackageIndex = do
 
     goContent fp name version lbs =
         case parsePackageDescription $ unpack $ dropBOM $ decodeUtf8 lbs of
-            ParseFailed e -> throwM $ CabalParseException (fpFromString fp) e
+            ParseFailed e -> throwM $ CabalParseException fp e
             ParseOk _warnings gpd -> do
                 let pd = packageDescription gpd
                     PackageIdentifier name' version' = package pd
                 when (name /= name' || version /= version') $
-                    throwM $ MismatchedNameVersion (fpFromString fp)
+                    throwM $ MismatchedNameVersion fp
                         name name' version version'
                 return gpd
 

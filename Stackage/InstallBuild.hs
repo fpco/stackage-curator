@@ -67,12 +67,13 @@ installBuild installFlags@InstallFlags{..} = do
 
     putStrLn $ "Loading build plan"
     plan <- case ifPlanSource of
-        BPSBundleWeb url -> withManager tlsManagerSettings $ \man -> do
+        BPSBundleWeb url -> do
+            man <- newManager tlsManagerSettings
             req <- parseUrl url
             res <- httpLbs req man
             planBSL <- getPlanEntry $ Tar.read $ GZip.decompress (responseBody res)
             decodeBuildPlan planBSL
-        BPSFile path -> Yaml.decodeFileEither (fpToString path) >>= either throwM return
+        BPSFile path -> Yaml.decodeFileEither path >>= either throwM return
 
     if ifSkipCheck
         then putStrLn "Skipping build plan check"

@@ -1,3 +1,7 @@
+## 0.11.0
+
+* Use newest version of libraries [#6](https://github.com/fpco/stackage-curator/issues/6)
+
 ## 0.10.0
 
 * Added `pcSkipBuild`

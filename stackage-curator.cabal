@@ -1,5 +1,5 @@
 name:                stackage-curator
-version:             0.10.0
+version:             0.11.0
 synopsis:            Tools for curating Stackage bundles
 description:         Please see <http://www.stackage.org/package/stackage-curator> for a description and documentation.
 homepage:            https://github.com/fpco/stackage
@@ -51,7 +51,7 @@ library
                      , utf8-string
 
                      , conduit-extra
-                     , classy-prelude-conduit < 0.12
+                     , classy-prelude-conduit >= 0.12
                      , text
                      , system-fileio
                      , system-filepath
@@ -69,7 +69,7 @@ library
                      , async
                      , streaming-commons >= 0.1.7.1
                      , semigroups
-                     , xml-conduit < 1.3
+                     , xml-conduit
                      , conduit
                      , stackage-types >= 1.1
                      , monad-unlift >= 0.1.1

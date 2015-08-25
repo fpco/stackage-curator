@@ -23,13 +23,12 @@ import           Data.Aeson
 import qualified Data.Map                    as Map
 import           Data.Yaml                   (decodeEither', decodeFileEither)
 import           Distribution.Package        (Dependency (..))
-import           Distribution.System         (Arch, OS)
 import qualified Distribution.System
 import           Distribution.Version        (anyVersion)
-import           Filesystem                  (isFile)
 import           Network.HTTP.Client         (Manager, httpLbs, responseBody, Request)
 import           Stackage.CorePackages
 import           Stackage.Prelude
+import           System.Directory            (doesFileExist)
 
 data BuildConstraints = BuildConstraints
     { bcPackages           :: Set PackageName
@@ -75,7 +74,7 @@ loadBuildConstraints :: BuildConstraintsSource -> Manager -> IO BuildConstraints
 loadBuildConstraints bcs man = do
     case bcs of
         BCSDefault -> do
-            e <- isFile fp0
+            e <- doesFileExist fp0
             if e
                 then loadFile fp0
                 else loadReq req0
@@ -85,7 +84,7 @@ loadBuildConstraints bcs man = do
     fp0 = "build-constraints.yaml"
     req0 = "https://raw.githubusercontent.com/fpco/stackage/master/build-constraints.yaml"
 
-    loadFile fp = decodeFileEither (fpToString fp) >>= either throwIO toBC
+    loadFile fp = decodeFileEither fp >>= either throwIO toBC
     loadReq req = httpLbs req man >>=
                   either throwIO toBC . decodeEither' . toStrict . responseBody
 
@@ -143,9 +142,9 @@ instance FromJSON ConstraintFile where
                 _ -> fail $ "Invalid GHC major version: " ++ unpack t
 
 data MismatchedGhcVersion = MismatchedGhcVersion
-    { mgvGhcOnPath :: !Version
-    , mgvExpectedMajor :: !Int
-    , mgcExpectedMinor :: !Int
+    { _mgvGhcOnPath :: !Version
+    , _mgvExpectedMajor :: !Int
+    , _mgcExpectedMinor :: !Int
     }
     deriving (Show, Typeable)
 instance Exception MismatchedGhcVersion

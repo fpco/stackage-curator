@@ -3,14 +3,8 @@
 module Main where
 
 import           Control.Monad
-import           Data.String                  (fromString)
-import           Data.Text                    (pack, stripPrefix)
 import qualified Data.Text                    as T
 import           Data.Text.Read               (decimal)
-import           Data.Version
-import           Filesystem.Path.CurrentOS    (decodeString)
-import           Network.HTTP.Client          (withManager)
-import           Network.HTTP.Client.TLS      (tlsManagerSettings)
 import           Options.Applicative
 import           Paths_stackage_curator       (version)
 import qualified Prelude
@@ -23,8 +17,7 @@ import           Stackage.Prelude             hiding ((<>))
 import           Stackage.Stats
 import           Stackage.Update
 import           Stackage.Upload
-import           System.IO                    (BufferMode (LineBuffering), hSetBuffering,
-                                               stdout)
+import           System.IO                    (BufferMode (LineBuffering), hSetBuffering)
 
 main :: IO ()
 main = do
@@ -100,18 +93,16 @@ main = do
                  metavar "URL" <>
                  help "Stackage bundle containing build plan")) <|>
          fmap
-            (BPSFile . decodeString)
+            BPSFile
             (strOption
                 (long "build-plan" <>
                  metavar "PATH" <>
                  help "Build-plan YAML file"))) <*>
-        fmap
-            decodeString
-            (strArgument
+         (strArgument
                 (metavar "DESTINATION-PATH" <>
                  help "Destination directory path")) <*>
         (fmap
-            (Just . decodeString)
+            Just
             (strOption
                 (long "log-dir" <>
                  metavar "PATH" <>
@@ -221,24 +212,24 @@ main = do
                         return $ TargetLts i j
             _ -> onErr
 
-    planFile = fmap decodeString $ strOption
+    planFile = strOption
          ( metavar "YAML-FILE"
         ++ long "plan-file"
         ++ help "YAML file containing a build plan"
          )
 
-    docmapFile = fmap decodeString $ strOption
+    docmapFile = strOption
          ( metavar "YAML-FILE"
         ++ long "docmap-file"
         ++ help "YAML file containing the docmap (list of all generated Haddock modules)"
          )
 
-    planFileArg = fmap decodeString $ strArgument
+    planFileArg = strArgument
          ( metavar "YAML-FILE"
         ++ help "YAML file containing a build plan"
          )
 
-    bundleFile = fmap decodeString $ strOption
+    bundleFile = strOption
          ( metavar "BUNDLE-FILE"
         ++ long "bundle-file"
         ++ help "Path to bundle file"

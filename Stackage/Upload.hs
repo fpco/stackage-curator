@@ -14,19 +14,13 @@ module Stackage.Upload
     , unStackageServer
     ) where
 
-import Control.Monad.Writer.Strict           (execWriter, tell)
 import Data.Default.Class                    (Default (..))
 import Data.Function                         (fix)
-import Filesystem                            (isDirectory, isFile)
 import Network.HTTP.Client
 import qualified Network.HTTP.Client.Conduit as HCC
-import Network.HTTP.Client.MultipartFormData
-import Stackage.BuildPlan                    (BuildPlan)
 import Stackage.Prelude
-import Stackage.ServerBundle                 (bpAllPackages, docsListing, writeIndexStyle)
-import System.IO.Temp                        (withSystemTempFile)
+import Stackage.ServerBundle                 (bpAllPackages)
 import qualified System.IO as IO
-import qualified Data.Yaml as Y
 
 newtype StackageServer = StackageServer { unStackageServer :: Text }
     deriving (Show, Eq, Ord, Hashable, IsString)
@@ -61,13 +55,13 @@ uploadHackageDistro name bp username password manager = do
         $ map go
         $ mapToList
         $ bpAllPackages bp
-    go (name, version) =
+    go (name', version) =
         "\"" ++
-        (toBuilder $ display name) ++
+        (toBuilder $ display name') ++
         "\",\"" ++
         (toBuilder $ display version) ++
         "\",\"https://www.stackage.org/package/" ++
-        (toBuilder $ display name) ++
+        (toBuilder $ display name') ++
         "\""
 
 data UploadBundleV2 = UploadBundleV2
@@ -77,7 +71,7 @@ data UploadBundleV2 = UploadBundleV2
     }
 
 uploadBundleV2 :: UploadBundleV2 -> Manager -> IO Text
-uploadBundleV2 UploadBundleV2 {..} man = IO.withBinaryFile (fpToString ub2Bundle) IO.ReadMode $ \h -> do
+uploadBundleV2 UploadBundleV2 {..} man = IO.withBinaryFile ub2Bundle IO.ReadMode $ \h -> do
     size <- IO.hFileSize h
     putStrLn $ "Bundle size: " ++ tshow size
     req1 <- parseUrl $ unpack $ unStackageServer ub2Server ++ "/upload2"

@@ -1,5 +1,1 @@
-resolver: lts-2.17
-extra-deps:
-- monad-unlift-0.1.1.0
-- stackage-metadata-0.3.0.0
-- stackage-types-1.1.0
+resolver: lts-3.0

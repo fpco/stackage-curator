@@ -20,20 +20,18 @@ import qualified Codec.Archive.Tar         as Tar
 import qualified Codec.Archive.Tar.Entry   as Tar
 import qualified Codec.Compression.GZip    as GZip
 import qualified Data.Map                  as M
-import           Data.Aeson (ToJSON (..), (.=), object, FromJSON (..), (.:), withObject)
-import System.IO.Temp (withTempDirectory)
 import qualified Data.Yaml                 as Y
-import           Filesystem                (isFile, getWorkingDirectory, listDirectory, isDirectory, canonicalizePath)
+import           Filesystem                (getWorkingDirectory, listDirectory)
+import qualified Filesystem.Path.CurrentOS as F
 import           Foreign.C.Types           (CTime (CTime))
 import           Stackage.BuildConstraints
 import           Stackage.BuildPlan
 import           Stackage.Prelude
-import           System.IO.Temp (withTempDirectory)
 import qualified System.PosixCompat.Time   as PC
 import qualified Text.XML                  as X
 import           Text.XML.Cursor
-import System.PosixCompat.Files (createSymbolicLink)
-import Stackage.Types
+import System.Directory (canonicalizePath, doesDirectoryExist, doesFileExist)
+import System.FilePath (takeFileName)
 
 -- | Get current time
 epochTime :: IO Tar.EpochTime
@@ -93,13 +91,13 @@ docsListing bp docsDir =
   where
     go :: (PackageName, Version) -> IO DocMap
     go (package, version) = do -- handleAny (const $ return mempty) $ do
-        let dirname = fpFromText (concat
+        let dirname = unpack (concat
                 [ display package
                 , "-"
                 , display version
                 ])
             indexFP = (docsDir </> dirname </> "index.html")
-        ie <- isFile indexFP
+        ie <- doesFileExist indexFP
         if ie
             then do
                 doc <- flip X.readFile indexFP X.def
@@ -114,10 +112,10 @@ docsListing bp docsDir =
                     pairs = cursor $// attributeIs "class" "module"
                                    &/ laxElement "a" >=> getPair
                 m <- fmap fold $ forM pairs $ \(href, name) -> do
-                    let suffix = dirname </> fpFromText href
-                    e <- isFile $ docsDir </> suffix
+                    let suffix = dirname </> unpack href
+                    e <- doesFileExist $ docsDir </> suffix
                     return $ if e
-                        then asMap $ singletonMap name [fpToText dirname, href]
+                        then asMap $ singletonMap name [pack dirname, href]
                         else mempty
                 return $ singletonMap (display package) $ PackageDocs
                     { pdVersion = display version
@@ -140,20 +138,20 @@ createBundleV2 CreateBundleV2 {..} = do
     docsDir <- canonicalizePath cb2DocsDir
     docMap <- docsListing cb2Plan cb2DocsDir
 
-    Y.encodeFile (fpToString $ docsDir </> "build-plan.yaml") cb2Plan
-    Y.encodeFile (fpToString $ docsDir </> "build-type.yaml") cb2Type
-    Y.encodeFile (fpToString $ docsDir </> "docs-map.yaml") docMap
-    Y.encodeFile (fpToString cb2DocmapFile) docMap
+    Y.encodeFile (docsDir </> "build-plan.yaml") cb2Plan
+    Y.encodeFile (docsDir </> "build-type.yaml") cb2Type
+    Y.encodeFile (docsDir </> "docs-map.yaml") docMap
+    Y.encodeFile cb2DocmapFile docMap
     void $ writeIndexStyle Nothing cb2DocsDir
 
     currentDir <- getWorkingDirectory
-    files <- listDirectory docsDir
+    files <- listDirectory $ fromString docsDir
 
     let args = "cfJ"
-             : fpToString (currentDir </> cb2Dest)
+             : (F.encodeString currentDir </> cb2Dest)
              : "--dereference"
-             : map (fpToString . filename) files
-        cp = (proc "tar" args) { cwd = Just $ fpToString docsDir }
+             : map (takeFileName . F.encodeString) files
+        cp = (proc "tar" args) { cwd = Just docsDir }
     withCheckedProcess cp $ \ClosedStream Inherited Inherited -> return ()
 
 writeIndexStyle :: Maybe Text -- ^ snapshot id
@@ -163,8 +161,8 @@ writeIndexStyle msnapid dir = do
     dirs <- fmap sort
           $ runResourceT
           $ sourceDirectory dir
-         $$ filterMC (liftIO . isDirectory)
-         =$ mapC (fpToString . filename)
+         $$ filterMC (liftIO . doesDirectoryExist)
+         =$ mapC takeFileName
          =$ sinkList
     writeFile (dir </> "index.html") $ mkIndex
         (unpack <$> msnapid)

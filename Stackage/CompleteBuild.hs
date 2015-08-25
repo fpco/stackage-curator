@@ -5,9 +5,7 @@
 {-# LANGUAGE RecordWildCards    #-}
 {-# LANGUAGE ViewPatterns       #-}
 module Stackage.CompleteBuild
-    ( BuildType (..)
-    , BumpType (..)
-    , BuildFlags (..)
+    ( BuildFlags (..)
     , checkPlan
     , getStackageAuthToken
     , createPlan
@@ -22,14 +20,11 @@ module Stackage.CompleteBuild
 
 import System.Directory (getAppUserDataDirectory)
 import Distribution.Package (Dependency)
-import Filesystem (isDirectory, createTree, isFile, rename)
+import Filesystem (createTree, isFile, rename)
 import Filesystem.Path (parent)
+import qualified Filesystem.Path.CurrentOS as F
 import Control.Concurrent        (threadDelay, getNumCapabilities)
 import Control.Concurrent.Async  (withAsync)
-import Data.Default.Class        (def)
-import Data.Semigroup            (Max (..), Option (..))
-import Data.Text.Read            (decimal)
-import Data.Time
 import Data.Yaml                 (decodeFileEither, encodeFile, decodeEither')
 import Network.HTTP.Client
 import Network.HTTP.Client.Conduit (bodyReaderSource)
@@ -44,11 +39,11 @@ import Stackage.UpdateBuildPlan
 import Stackage.Upload
 import System.Environment        (lookupEnv)
 import Filesystem.Path           (dropExtension)
-import System.IO                 (BufferMode (LineBuffering), hSetBuffering)
 import Control.Monad.Trans.Unlift (askRunBase, MonadBaseUnlift)
 import Data.Function (fix)
 import Control.Concurrent.Async (Concurrently (..))
 import Stackage.Curator.UploadDocs (uploadDocs)
+import System.Directory (doesDirectoryExist, doesFileExist)
 
 -- | Flags passed in from the command line.
 data BuildFlags = BuildFlags
@@ -70,106 +65,12 @@ data BuildFlags = BuildFlags
     , bfLoadPlan         :: !Bool
     } deriving (Show)
 
-data BuildType = Nightly | LTS BumpType Text
-    deriving (Show, Read, Eq, Ord)
-
-data BumpType = Major | Minor
-    deriving (Show, Read, Eq, Ord)
-
-data Settings = Settings
-    { plan      :: BuildPlan
-    , planFile  :: FilePath
-    , buildDir  :: FilePath
-    , logDir    :: FilePath
-    , title     :: Text -> Text -- ^ GHC version -> title
-    , slug      :: Text
-    , postBuild :: IO ()
-    , distroName :: Text -- ^ distro name on Hackage
-    , snapshotType :: SnapshotType
-    , bundleDest :: FilePath
-    }
-
-nightlyPlanFile :: Text -- ^ day
-                -> FilePath
-nightlyPlanFile day = fpFromText ("nightly-" ++ day) <.> "yaml"
-
-nightlySettings :: Day
-                -> BuildFlags
-                -> BuildPlan
-                -> Settings
-nightlySettings day' bf plan' = Settings
-    { planFile = fromMaybe (nightlyPlanFile day) (bfPlanFile bf)
-    , buildDir = fpFromText $ "builds/nightly"
-    , logDir = fpFromText $ "logs/stackage-nightly-" ++ day
-    , title = \ghcVer -> concat
-        [ "Stackage Nightly "
-        , day
-        , ", GHC "
-        , ghcVer
-        ]
-    , slug = slug'
-    , plan = plan'
-    , postBuild = return ()
-    , distroName = "Stackage"
-    , snapshotType = STNightly2 day'
-    , bundleDest = fromMaybe
-        (fpFromText $ "stackage-nightly-" ++ day ++ ".bundle")
-        (bfBundleDest bf)
-    }
-  where
-    slug' = "nightly-" ++ day
-    day = tshow day'
-
-parseGoal :: MonadThrow m
-          => BumpType
-          -> Text
-          -> m (LTSVer -> Bool)
-parseGoal _ "" = return $ const True
-parseGoal bumpType t =
-    case decimal t of
-        Right (major, "") -> return $ \(LTSVer major' _) ->
-            case bumpType of
-                -- For major bumps: specifying 2 means we want to ignore
-                -- anything in the 2.* range
-                Major -> major' < major
-
-                -- But for minor bumps, specifying 2 means we want to include
-                -- everything in 2.*, and start ignore 3.*
-                Minor -> major' <= major
-        _ ->
-            case parseLTSRaw t of
-                Nothing -> throwM $ ParseGoalFailure t
-                Just x -> return (< x)
-
-data ParseGoalFailure = ParseGoalFailure Text
-    deriving (Show, Typeable)
-instance Exception ParseGoalFailure
-
-data LTSVer = LTSVer !Int !Int
-    deriving (Eq, Ord)
-instance Show LTSVer where
-    show (LTSVer x y) = concat [show x, ".", show y]
-incrLTSVer :: LTSVer -> LTSVer
-incrLTSVer (LTSVer x y) = LTSVer x (y + 1)
-
-parseLTSVer :: FilePath -> Maybe LTSVer
-parseLTSVer fp = do
-    w <- stripPrefix "lts-" $ fpToText fp
-    x <- stripSuffix ".yaml" w
-    parseLTSRaw x
-
-parseLTSRaw :: Text -> Maybe LTSVer
-parseLTSRaw x = do
-    Right (major, y) <- Just $ decimal x
-    z <- stripPrefix "." y
-    Right (minor, "") <- Just $ decimal z
-    return $ LTSVer major minor
-
 createPlan :: Target
            -> FilePath
            -> [Dependency] -- ^ additional constraints
            -> IO ()
-createPlan target dest constraints = withManager tlsManagerSettings $ \man -> do
+createPlan target dest constraints = do
+    man <- newManager tlsManagerSettings
     putStrLn $ "Creating plan for: " ++ tshow target
     bc <-
         case target of
@@ -191,20 +92,14 @@ createPlan target dest constraints = withManager tlsManagerSettings $ \man -> do
 
     plan <- planFromConstraints $ setConstraints constraints bc
 
-    putStrLn $ "Writing build plan to " ++ fpToText dest
-    encodeFile (fpToString dest) plan
+    putStrLn $ "Writing build plan to " ++ pack dest
+    encodeFile dest plan
 
+planFromConstraints :: MonadIO m => BuildConstraints -> m BuildPlan
 planFromConstraints bc = do
     putStrLn "Creating build plan"
     plans <- getLatestAllowedPlans bc
     newBuildPlan plans bc
-
-renderLTSVer :: LTSVer -> FilePath
-renderLTSVer lts = fpFromText $ concat
-    [ "lts-"
-    , tshow lts
-    , ".yaml"
-    ]
 
 -- | Just print a message saying "still alive" every minute, to appease Travis.
 stillAlive :: IO () -> IO ()
@@ -214,13 +109,14 @@ stillAlive inner =
     printer i = forever $ do
         threadDelay 60000000
         putStrLn $ "Still alive: " ++ tshow i
-        printer $! i + 1
+        printer $! i + (1 :: Int)
 
 -- | Generate and check a new build plan, but do not execute it.
 --
 -- Since 0.3.1
 checkPlan :: Maybe FilePath -> IO ()
-checkPlan mfp = stillAlive $ withManager tlsManagerSettings $ \man -> do
+checkPlan mfp = stillAlive $ do
+    man <- newManager tlsManagerSettings
     plan <-
         case mfp of
             Nothing -> do
@@ -234,14 +130,15 @@ checkPlan mfp = stillAlive $ withManager tlsManagerSettings $ \man -> do
 
                 return plan
             Just fp -> do
-                putStrLn $ "Loading plan from " ++ fpToText fp
-                decodeFileEither (fpToString fp) >>= either throwM return
+                putStrLn $ "Loading plan from " ++ pack fp
+                decodeFileEither fp >>= either throwM return
 
     putStrLn "Checking plan"
     checkBuildPlan plan
 
     putStrLn "Plan seems valid!"
 
+{- FIXME remove
 getPerformBuild :: BuildFlags -> Settings -> IO PerformBuild
 getPerformBuild buildFlags Settings {..} = do
     jobs <- maybe getNumCapabilities return $ bfJobs buildFlags
@@ -261,11 +158,11 @@ getPerformBuild buildFlags Settings {..} = do
         , pbBuildHoogle = bfBuildHoogle buildFlags
         }
 
-{- FIXME remove
 -- | Make a complete plan, build, test and upload bundle, docs and
 -- distro.
 completeBuild :: BuildType -> BuildFlags -> IO ()
-completeBuild buildType buildFlags = withManager tlsManagerSettings $ \man -> do
+completeBuild buildType buildFlags = do
+    man <- newManager tlsManagerSettings
     hSetBuffering stdout LineBuffering
 
     settings@Settings {..} <- if bfLoadPlan buildFlags
@@ -280,7 +177,7 @@ completeBuild buildType buildFlags = withManager tlsManagerSettings $ \man -> do
             settings@Settings {..} <- getSettings man buildFlags buildType Nothing
 
             putStrLn $ "Writing build plan to: " ++ fpToText planFile
-            encodeFile (fpToString planFile) plan
+            encodeFile planFile plan
 
             if bfSkipCheck buildFlags
                 then putStrLn "Skipping build plan check"
@@ -348,8 +245,9 @@ hackageDistro
     :: FilePath -- ^ plan file
     -> Target
     -> IO ()
-hackageDistro planFile target = withManager tlsManagerSettings $ \man -> do
-    plan <- decodeFileEither (fpToString planFile) >>= either throwM return
+hackageDistro planFile target = do
+    man <- newManager tlsManagerSettings
+    plan <- decodeFileEither planFile >>= either throwM return
     ecreds <- tryIO $ readFile "/hackage-creds"
     case map encodeUtf8 $ words $ decodeUtf8 $ either (const "") id ecreds of
         [username, password] -> do
@@ -365,7 +263,7 @@ hackageDistro planFile target = withManager tlsManagerSettings $ \man -> do
 
 checkoutRepo :: Target -> IO ([String] -> IO (), FilePath, FilePath)
 checkoutRepo target = do
-    root <- fmap (</> "curator") $ fpFromString <$> getAppUserDataDirectory "stackage"
+    root <- fmap (</> "curator") $ getAppUserDataDirectory "stackage"
 
     let repoDir =
             case target of
@@ -374,25 +272,25 @@ checkoutRepo target = do
 
         runIn wdir cmd args = do
             putStrLn $ concat
-                [ fpToText wdir
+                [ pack wdir
                 , ": "
                 , tshow (cmd:args)
                 ]
             withCheckedProcess
                 (proc cmd args)
-                    { cwd = Just $ fpToString wdir
+                    { cwd = Just wdir
                     } $ \ClosedStream Inherited Inherited -> return ()
 
         git = runIn repoDir "git"
 
         name =
             case target of
-                TargetNightly day -> fpFromString $ concat
+                TargetNightly day -> concat
                     [ "nightly-"
                     , show day
                     , ".yaml"
                     ]
-                TargetLts x y -> fpFromString $ concat
+                TargetLts x y -> concat
                     [ "lts-"
                     , show x
                     , "."
@@ -403,19 +301,19 @@ checkoutRepo target = do
         destFPPlan = repoDir </> name
         destFPDocmap = repoDir </> "docs" </> name
 
-    exists <- isDirectory repoDir
+    exists <- doesDirectoryExist repoDir
     if exists
         then do
             git ["fetch"]
             git ["checkout", "origin/master"]
         else do
-            createTree $ parent repoDir
-            runIn "." "git" ["clone", repoUrl, fpToString repoDir]
+            createTree $ parent $ fromString repoDir
+            runIn "." "git" ["clone", repoUrl, repoDir]
 
-    whenM (liftIO $ isFile destFPPlan)
-        $ error $ "File already exists: " ++ fpToString destFPPlan
-    whenM (liftIO $ isFile destFPDocmap)
-        $ error $ "File already exists: " ++ fpToString destFPDocmap
+    whenM (liftIO $ doesFileExist destFPPlan)
+        $ error $ "File already exists: " ++ destFPPlan
+    whenM (liftIO $ doesFileExist destFPDocmap)
+        $ error $ "File already exists: " ++ destFPDocmap
 
     return (git, destFPPlan, destFPDocmap)
   where
@@ -432,20 +330,21 @@ uploadGithub
 uploadGithub planFile docmapFile target = do
     (git, destFPPlan, destFPDocmap) <- checkoutRepo target
 
-    createTree $ parent destFPDocmap
+    createTree $ parent $ fromString destFPDocmap
     runResourceT $ do
         sourceFile planFile $$ (sinkFile destFPPlan :: Sink ByteString (ResourceT IO) ())
         sourceFile docmapFile $$ (sinkFile destFPDocmap :: Sink ByteString (ResourceT IO) ())
 
-    git ["add", fpToString destFPPlan, fpToString destFPDocmap]
-    git ["commit", "-m", "Checking in " ++ fpToString (dropExtension destFPPlan)]
+    git ["add", destFPPlan, destFPDocmap]
+    git ["commit", "-m", "Checking in " ++ F.encodeString (dropExtension $ fromString destFPPlan)]
     git ["push", "origin", "HEAD:master"]
 
 upload
     :: FilePath -- ^ bundle file
     -> StackageServer -- ^ server URL
     -> IO ()
-upload bundleFile server = withManager tlsManagerSettings $ \man -> do
+upload bundleFile server = do
+    man <- newManager tlsManagerSettings
     putStrLn "Uploading bundle to Stackage Server"
 
     token <- getStackageAuthToken
@@ -475,7 +374,7 @@ installDest :: Target -> FilePath
 installDest target =
     case target of
         TargetNightly _ -> "builds/nightly"
-        TargetLts x _ -> fpFromText $ "builds/lts-" ++ tshow x
+        TargetLts x _ -> unpack $ "builds/lts-" ++ tshow x
 
 makeBundle
     :: FilePath -- ^ plan file
@@ -495,7 +394,7 @@ makeBundle
   planFile docmapFile bundleFile target mjobs skipTests skipHaddocks skipHoogle
   enableLibraryProfiling enableExecutableDynamic verbose allowNewer
         = do
-    plan <- decodeFileEither (fpToString planFile) >>= either throwM return
+    plan <- decodeFileEither planFile >>= either throwM return
     jobs <- maybe getNumCapabilities return mjobs
     let pb = PerformBuild
             { pbPlan = plan
@@ -504,7 +403,7 @@ makeBundle
             , pbLogDir =
                 case target of
                     TargetNightly _ -> "logs/nightly"
-                    TargetLts x _ -> fpFromText $ "logs/lts-" ++ tshow x
+                    TargetLts x _ -> unpack $ "logs/lts-" ++ tshow x
             , pbJobs = jobs
             , pbGlobalInstall = False
             , pbEnableTests = not skipTests
@@ -519,7 +418,7 @@ makeBundle
     putStrLn "Performing build"
     performBuild pb >>= mapM_ putStrLn
 
-    putStrLn $ "Creating bundle (v2) at: " ++ fpToText bundleFile
+    putStrLn $ "Creating bundle (v2) at: " ++ pack bundleFile
     createBundleV2 CreateBundleV2
         { cb2Plan = plan
         , cb2Type =
@@ -532,14 +431,15 @@ makeBundle
         }
 
 fetch :: FilePath -> IO ()
-fetch planFile = withManager tlsManagerSettings $ \man -> do
+fetch planFile = do
+    man <- newManager tlsManagerSettings
     -- First make sure to fetch all of the dependencies... just in case Hackage
     -- has an outage. Don't feel like wasting hours of CPU time.
     putStrLn "Pre-fetching all packages"
 
-    plan <- decodeFileEither (fpToString planFile) >>= either throwM return
+    plan <- decodeFileEither planFile >>= either throwM return
 
-    cabalDir <- fpFromString <$> getAppUserDataDirectory "cabal"
+    cabalDir <- getAppUserDataDirectory "cabal"
     parMapM_ 8 (download man cabalDir) $ mapToList $ bpPackages plan
   where
     download man cabalDir (display -> name, display . ppVersion -> version) = do
@@ -554,9 +454,9 @@ fetch planFile = withManager tlsManagerSettings $ \man -> do
             createTree $ parent fp
             req <- parseUrl url
             withResponse req man $ \res -> do
-                let tmp = fp <.> "tmp"
+                let tmp = F.encodeString fp <.> "tmp"
                 runResourceT $ bodyReaderSource (responseBody res) $$ sinkFile tmp
-                rename tmp fp
+                rename (fromString tmp) fp
       where
         url = unpack $ concat
             [ "https://s3.amazonaws.com/hackage.fpcomplete.com/package/"
@@ -565,12 +465,12 @@ fetch planFile = withManager tlsManagerSettings $ \man -> do
             , version
             , ".tar.gz"
             ]
-        fp = cabalDir </>
+        fp = fromString $ cabalDir </>
              "packages" </>
              "hackage.haskell.org" </>
-             fpFromText name </>
-             fpFromText version </>
-             fpFromText (concat [name, "-", version, ".tar.gz"])
+             unpack name </>
+             unpack version </>
+             unpack (concat [name, "-", version, ".tar.gz"])
 
 parMapM_ :: (MonadIO m, MonadBaseUnlift IO m, MonoFoldable mono)
          => Int

@@ -38,6 +38,8 @@ import           Network.AWS.S3                (ObjectCannedACL (PublicRead),
                                                 poContentType, putObject)
 import           Network.Mime                  (defaultMimeLookup)
 import           Stackage.Types                (simpleParse)
+import qualified System.Directory              as Dir
+import qualified System.FilePath               as FP
 import           Text.Blaze.Html               (toHtml)
 import           Text.Blaze.Html.Renderer.Utf8 (renderHtml)
 import           Text.HTML.DOM                 (eventConduit)
@@ -79,8 +81,8 @@ uploadDocs :: FilePath -- ^ directory containing docs
 uploadDocs input' bundleFile name bucket = do
     env <- getEnv NorthVirginia Discover
 
-    unlessM (F.isDirectory input') $ error $ "Could not find directory: " ++ show input'
-    input <- fmap (</> "") $ F.canonicalizePath input'
+    unlessM (Dir.doesDirectoryExist input') $ error $ "Could not find directory: " ++ show input'
+    input <- fmap (</> "") $ Dir.canonicalizePath input'
 
     let inner = sourceDirectoryDeep False input $$ mapM_C (go input name)
     runResourceT $ do
@@ -94,8 +96,8 @@ uploadDocs input' bundleFile name bucket = do
 -- | Create a TAR entry for each Hoogle txt file. Unfortunately doesn't stream.
 toEntry :: FilePath -> IO Tar.Entry
 toEntry fp = do
-    tp <- either error return $ Tar.toTarPath False $ fpToString $ F.filename fp
-    Tar.packFileEntry (fpToString fp) tp
+    tp <- either error return $ Tar.toTarPath False $ F.encodeString $ F.filename $ fromString fp
+    Tar.packFileEntry fp tp
 
 upload' :: (MonadResource m, MonadReader (Env, Text) m)
         => Bool -- ^ compress?
@@ -117,10 +119,10 @@ upload' toCompress name src = do
 
 isHoogleFile :: FilePath -> FilePath -> Bool
 isHoogleFile input fp' = fromMaybe False $ do
-    fp <- F.stripPrefix input fp'
+    fp <- F.stripPrefix (fromString input) (fromString fp')
     [dir, name] <- Just $ F.splitDirectories fp
-    pkgver <- stripSuffix "/" $ fpToText dir
-    (fpToText -> pkg, ["txt"]) <- Just $ F.splitExtensions name
+    pkgver <- stripSuffix "/" $ pack $ F.encodeString dir
+    (pack . F.encodeString -> pkg, ["txt"]) <- Just $ F.splitExtensions name
     PackageIdentifier pkg1 _ver <- simpleParse pkgver
     pkg2 <- simpleParse pkg
     return $ pkg1 == pkg2
@@ -132,7 +134,7 @@ go :: M m
    -> m ()
 go input name fp
     | isHoogleFile input fp = tell $! singletonSet fp
-    | hasExtension fp "html" = do
+    | F.hasExtension (fromString fp) "html" = do
         doc <- sourceFile fp
             $= eventConduit
             $= (do
@@ -147,12 +149,12 @@ go input name fp
         -- Sink to a Document and then use blaze-html to render to avoid using
         -- XML rendering rules (e.g., empty elements)
         upload' True key $ sourceLazy (renderHtml $ toHtml doc)
-    | any (hasExtension fp) $ words "css js png svg gif" = void $ getName fp
+    | any (F.hasExtension $ fromString fp) $ words "css js png svg gif" = void $ getName fp
     | otherwise = upload' True key $ sourceFile fp
   where
-    Just suffix = F.stripPrefix input fp
+    Just suffix = F.stripPrefix (fromString input) (fromString fp)
     toRoot = concat $ asList $ replicate (length $ F.splitDirectories suffix) $ asText "../"
-    key = name ++ "/" ++ fpToText suffix
+    key = name ++ "/" ++ pack (F.encodeString suffix)
 
 goEvent :: M m
         => FilePath -- HTML file path
@@ -170,8 +172,8 @@ goAttr :: M m
        -> m (Name, [Content])
 goAttr htmlfp toRoot pair@(name, [ContentText value])
     | isRef name && not (".html" `isSuffixOf` value) = do
-        let fp = F.parent htmlfp </> fpFromText value
-        exists <- liftIO $ F.isFile fp
+        let fp = FP.takeDirectory htmlfp </> unpack value
+        exists <- liftIO $ F.isFile $ fromString fp
         if exists
             then do
                 x <- getName fp
@@ -201,8 +203,8 @@ getName src = do
 toHash :: M m => FilePath -> m Text
 toHash src = do
     (digest, lbs) <- sourceFile src $$ sink
-    let hash' = decodeUtf8 $ B16.encode $ toBytes (digest :: Digest SHA256)
-        name = fpToText $ F.addExtensions ("byhash" </> fpFromText hash') (F.extensions src)
+    let hash' = unpack $ decodeUtf8 $ B16.encode $ toBytes (digest :: Digest SHA256)
+        name = pack $ F.encodeString $ F.addExtensions (fromString $ "byhash" </> hash') (F.extensions $ fromString src)
     (m, s) <- get
     unless (name `member` s) $ do
         put (m, insertSet name s)

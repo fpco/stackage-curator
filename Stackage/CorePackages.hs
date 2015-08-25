@@ -11,10 +11,11 @@ module Stackage.CorePackages
 import           Control.Monad.State.Strict (StateT, execStateT, get, modify,
                                              put)
 import qualified Data.Map.Lazy              as Map
-import qualified Data.Text                  as T
 import           Filesystem                 (listDirectory)
+import qualified Filesystem.Path.CurrentOS  as F
 import           Stackage.Prelude
 import           System.Directory           (findExecutable)
+import           System.FilePath            (takeDirectory, takeFileName)
 
 addDeepDepends :: PackageName -> StateT (Map PackageName Version) IO ()
 addDeepDepends name@(PackageName name') = do
@@ -107,8 +108,8 @@ getCoreExecutables = do
     dir <-
         case mfp of
             Nothing -> error "No ghc executable found on PATH"
-            Just fp -> return $ directory $ fpFromString fp
-    (setFromList . map (ExeName . fpToText . filename)) <$> listDirectory dir
+            Just fp -> return $ takeDirectory fp
+    (setFromList . map (ExeName . pack . takeFileName . F.encodeString)) <$> listDirectory (fromString dir)
 
 getGhcVersion :: IO Version
 getGhcVersion = do

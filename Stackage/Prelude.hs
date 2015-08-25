@@ -22,7 +22,7 @@ import           Distribution.Version            as X (withinRange)
 import qualified Distribution.Version            as C
 import           Filesystem                      (createTree)
 import           Filesystem.Path                 (parent)
-import qualified Filesystem.Path                 as F
+import qualified Filesystem.Path.CurrentOS       as F
 import Stackage.Types as X
 
 -- | There seems to be a bug in Cabal where serializing and deserializing
@@ -64,10 +64,10 @@ copyDir :: FilePath -> FilePath -> IO ()
 copyDir src dest =
     runResourceT $ sourceDirectoryDeep False src $$ mapM_C go
   where
-    src' = src </> ""
-    go fp = forM_ (F.stripPrefix src' fp) $ \suffix -> do
-        let dest' = dest </> suffix
-        liftIO $ createTree $ parent dest'
+    src' = fromString src F.</> ""
+    go fp = forM_ (F.stripPrefix src' $ fromString fp) $ \suffix -> do
+        let dest' = dest </> F.encodeString suffix
+        liftIO $ createTree $ parent $ fromString dest'
         sourceFile fp $$ (sinkFile dest' :: Sink ByteString (ResourceT IO) ())
 
 data Target = TargetNightly !Day

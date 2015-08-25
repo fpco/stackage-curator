@@ -19,9 +19,7 @@ module Stackage.BuildPlan
     ) where
 
 import           Control.Monad.State.Strict      (execState, get, put)
-import           Data.Aeson
 import qualified Data.Map                        as Map
-import qualified Data.Set                        as Set
 import qualified Distribution.Compiler
 import           Distribution.PackageDescription
 import           Stackage.BuildConstraints
