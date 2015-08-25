@@ -19,8 +19,6 @@ module Stackage.PackageDescription
 
 import           Control.Monad.Writer.Strict     (MonadWriter, execWriterT,
                                                   tell)
-import           Data.Aeson
-import qualified Data.Map                        as Map
 import           Distribution.Compiler           (CompilerFlavor)
 import           Distribution.Package            (Dependency (..))
 import           Distribution.PackageDescription

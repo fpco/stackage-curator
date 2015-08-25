@@ -110,7 +110,7 @@ upload' toCompress name src = do
             eres <- liftResourceT $ tryAny $ src $$ upload toCompress env bucket name
             case eres of
                 Left e
-                    | i <= 0 -> throwIO e
+                    | i <= (0 :: Int) -> throwIO e
                     | otherwise -> do
                         putStrLn $ "Exception, retrying: " ++ tshow e
                         loop $! i - 1
@@ -197,7 +197,7 @@ getName src = do
         Just x -> return x
         Nothing -> do
             x <- toHash src
-            modify $ \(m, s) -> (insertMap src x m, s)
+            modify $ \(m', s) -> (insertMap src x m', s)
             return x
 
 toHash :: M m => FilePath -> m Text
