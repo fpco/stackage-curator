@@ -18,7 +18,7 @@ import qualified Codec.Archive.Tar as Tar
 import Data.Conduit.Lazy (lazyConsume)
 import Codec.Compression.GZip (compress)
 import           Network.AWS                   (Credentials (Discover),
-                                                Region (NorthVirginia), getEnv)
+                                                Region (NorthVirginia), newEnv)
 import Stackage.Curator.UploadDocs (upload)
 
 uploadIndex
@@ -28,7 +28,7 @@ uploadIndex
     -> Text -- ^ key prefix
     -> IO ()
 uploadIndex bpFile target bucket prefix = do
-    env <- getEnv NorthVirginia Discover
+    env <- newEnv NorthVirginia Discover
     bp <- decodeFileEither bpFile >>= either throwM return
     let toInclude = getToInclude bp
     runResourceT $ do

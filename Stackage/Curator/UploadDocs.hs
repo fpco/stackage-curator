@@ -29,13 +29,13 @@ import           Distribution.Package          (PackageIdentifier (..))
 import qualified Filesystem                    as F
 import qualified Filesystem.Path.CurrentOS     as F
 import           Network.AWS                   (Credentials (Discover), Env,
-                                                Region (NorthVirginia), getEnv,
-                                                send)
-import           Network.AWS.Data              (toBody)
-import           Network.AWS.S3                (ObjectCannedACL (PublicRead),
+                                                Region (NorthVirginia), newEnv,
+                                                send, toBody, runAWS)
+import           Network.AWS.S3                (ObjectCannedACL (OPublicRead),
                                                 poACL, poCacheControl,
                                                 poContentEncoding,
-                                                poContentType, putObject)
+                                                poContentType, putObject,
+                                                BucketName (..), ObjectKey (..))
 import           Network.Mime                  (defaultMimeLookup)
 import           Stackage.Types                (simpleParse)
 import qualified System.Directory              as Dir
@@ -64,22 +64,20 @@ upload toCompress env bucket name = do
                 then set poContentEncoding (Just "gzip")
                 else id)
            $ set poCacheControl (Just "maxage=31536000")
-           $ set poACL (Just PublicRead)
-           $ putObject (toBody body) bucket name
+           $ set poACL (Just OPublicRead)
+           $ putObject (BucketName bucket) (ObjectKey name) (toBody body)
     putStrLn $ "Sending " ++ name
-    eres <- liftResourceT $ send env po
-    case eres of
-        Left e -> error $ show e
-        Right _ -> return ()
+    _pors <- liftResourceT $ runAWS env $ send po
+    return ()
 
--- | Uses 'getEnv' for S3 credentials.
+-- | Uses 'newEnv' for S3 credentials.
 uploadDocs :: FilePath -- ^ directory containing docs
            -> FilePath -- ^ the bundle file
            -> Text -- ^ name of current docs, used as prefix in object names
            -> Text -- ^ bucket name
            -> IO ()
 uploadDocs input' bundleFile name bucket = do
-    env <- getEnv NorthVirginia Discover
+    env <- newEnv NorthVirginia Discover
 
     unlessM (Dir.doesDirectoryExist input') $ error $ "Could not find directory: " ++ show input'
     input <- fmap (</> "") $ Dir.canonicalizePath input'

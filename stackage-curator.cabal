@@ -77,7 +77,7 @@ library
                      , blaze-html
                      , html-conduit
                      , mime-types
-                     , amazonka
+                     , amazonka >= 1.1
                      , amazonka-s3
                      , amazonka-core
                      , xml-types
