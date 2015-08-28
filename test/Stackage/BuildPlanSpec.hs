@@ -57,7 +57,8 @@ badBuildPlan m _ = do
 check :: (Manager -> IO BuildConstraints)
       -> (BuildConstraints -> IO (Map PackageName PackagePlan))
       -> IO ()
-check readPlanFile getPlans = withManager tlsManagerSettings $ \man -> do
+check readPlanFile getPlans = do
+    man <- newManager tlsManagerSettings
     bc <- readPlanFile man
     plans <- getPlans bc
     bp <- newBuildPlan plans bc
@@ -138,7 +139,6 @@ anyV = anyVersion
 -- | Test plan.
 testBuildConstraints :: void -> IO BuildConstraints
 testBuildConstraints _ =
-    decodeFileEither
-        (fpToString fp) >>=
+    decodeFileEither fp >>=
     either throwIO toBC
     where fp = "test/test-build-constraints.yaml"
