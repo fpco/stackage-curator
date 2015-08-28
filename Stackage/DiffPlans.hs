@@ -5,10 +5,8 @@ module Stackage.DiffPlans
     ) where
 
 import           Data.Map (filterWithKey)
-import           Data.Text (Text, justifyLeft)
-import qualified Data.Text as T
+import           Data.Text (justifyLeft)
 import           Data.Yaml (decodeFileEither)
-import qualified Distribution.Text as DT
 import           Network.HTTP.Client
 import           Network.HTTP.Client.TLS (tlsManagerSettings)
 import           Stackage.Prelude
@@ -23,11 +21,13 @@ data Change = Added | Deleted | MajorBump | MinorBump | Unchanged
 data AndOr a = Old a | New a | Both a a
     deriving Show
 instance Semigroup (AndOr a) where
-    Old x    <> New y = Both x y
-    New y    <> Old x = Both x y
-    Old x    <> Old _ = Old x
-    New x    <> New _ = New x
-    Both x y <> _     = Both x y
+    Old x    <> New y    = Both x y
+    New y    <> Old x    = Both x y
+    Old x    <> Old _    = Old x
+    New x    <> New _    = New x
+    Both x y <> _        = Both x y
+    Old x    <> Both _ y = Both x y
+    New y    <> Both x _ = Both x y
 
 type DiffMap = Map Change (Map PackageName (Text,Maybe Text))
 
@@ -39,10 +39,10 @@ diffPlans :: FilePath -- ^ old YAML build plan file
           -> Bool     -- ^ wrap output in HTML
           -> IO ()
 diffPlans oldFP newFP diffsOnly useColor True asHtml = do
-    (oldFP', newFP') <- (,) <$> getLTS (fpToString oldFP) <*> getLTS (fpToString newFP)
+    (oldFP', newFP') <- (,) <$> getLTS oldFP <*> getLTS newFP
     diffPlans oldFP' newFP' diffsOnly useColor False asHtml
-    delFile $ fpToString oldFP'
-    delFile $ fpToString newFP'
+    delFile oldFP'
+    delFile newFP'
 
     where
         delFile fp = removeFile fp `catch` \(_::SomeException) -> return ()
@@ -61,7 +61,7 @@ diffPlans oldFP newFP diffsOnly useColor False asHtml = do
        then print $ htmlOut True m
        else consoleOut useColor  m
   where
-    parse fp = decodeFileEither (fpToString fp)
+    parse fp = decodeFileEither fp
            >>= either throwIO (return . toSimple)
 
     toSimple = fmap ppVersion . bpPackages
@@ -88,13 +88,13 @@ isMajor (Version old _) (Version new _) =
 getLTS :: String -> IO FilePath
 getLTS lts = do
     createDirectoryIfMissing True tmpDir
-    withManager tlsManagerSettings $ \man -> do
-        req <- parseUrl $ ltsRepo <> lts <> ".yaml"
-        res <- httpLbs req man
-        writeFile fName $ responseBody res
-        return fName
+    man <- newManager tlsManagerSettings
+    req <- parseUrl $ ltsRepo <> lts <> ".yaml"
+    res <- httpLbs req man
+    writeFile fName $ responseBody res
+    return fName
   where
-    fName   = fpFromString $ tmpDir <> lts <> ".yaml"
+    fName   = tmpDir <> lts <> ".yaml"
     ltsRepo = "https://raw.githubusercontent.com/fpco/lts-haskell/master/"
     tmpDir  = "/tmp/stackage-curator/"
 
@@ -109,18 +109,18 @@ colorize useHtml change s =
       MajorBump -> yellow s
       MinorBump -> blue   s
   where
-      showInColor consCol htmlColor s
+      showInColor consCol htmlColor s'
           | useHtml   = "color: " <> htmlColor
-          | otherwise = "\ESC["   <> consCol <> "m" <> s <> "\ESC[0m"
+          | otherwise = "\ESC["   <> consCol <> "m" <> s' <> "\ESC[0m"
 
-      black   = showInColor "30" "black"
+      --black   = showInColor "30" "black"
       red     = showInColor "31" "red"
       green   = showInColor "32" "green"
       yellow  = showInColor "33" "yellow"
       blue    = showInColor "34" "blue"
-      magenta = showInColor "35" "magenta"
-      cyan    = showInColor "36" "cyan"
-      white   = showInColor "37" "white"
+      --magenta = showInColor "35" "magenta"
+      --cyan    = showInColor "36" "cyan"
+      --white   = showInColor "37" "white"
 
 
 -- | Display to console
@@ -129,9 +129,9 @@ consoleOut useColor m =
     forM_ (mapToList m) $ \(change, m') -> do
         print change
         forM_ (mapToList m') $ \(pkg, (x,y)) ->
-            let pkgName = (if useColor then colorize False change else id)
+            let pkgName' = (if useColor then colorize False change else id)
                             $ justifyLeft 25 ' ' $ display pkg
-             in putStrLn $ pkgName             <>
+             in putStrLn $ pkgName'             <>
                            justifyLeft 9 ' ' x  <>
                            if isJust y
                               then "  =>  "     <> fromJust y
