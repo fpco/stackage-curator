@@ -89,6 +89,7 @@ library
                      , stackage-metadata >= 0.3
                      , stackage-install >= 0.1.1
                      , lucid
+                     , stackage-update
 
 executable stackage-curator
   default-language:    Haskell2010

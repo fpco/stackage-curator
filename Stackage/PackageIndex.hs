@@ -22,21 +22,34 @@ import           Distribution.PackageDescription.Parse (ParseResult (..),
                                                         parsePackageDescription)
 import           Distribution.ParseUtils               (PError)
 import           Stackage.Prelude
-import           System.Directory                      (getAppUserDataDirectory)
+import           Stackage.Update
+import           System.Directory                      (doesFileExist, getAppUserDataDirectory)
 
 -- | Name of the 00-index.tar downloaded from Hackage.
 getPackageIndexPath :: MonadIO m => m FilePath
 getPackageIndexPath = liftIO $ do
     c <- getCabalRoot
-    configLines <- runResourceT $ sourceFile (c </> "config")
-                               $$ decodeUtf8C
-                               =$ linesUnboundedC
-                               =$ concatMapC getRemoteCache
-                               =$ sinkList
-    case configLines of
-        [x] -> return $ x </> "hackage.haskell.org" </> "00-index.tar"
-        [] -> error $ "No remote-repo-cache found in Cabal config file"
-        _ -> error $ "Multiple remote-repo-cache entries found in Cabal config file"
+    let configFile = c </> "config"
+    exists <- liftIO $ doesFileExist configFile
+    remoteCache <- if exists
+        then do
+            configLines <- runResourceT $ sourceFile (c </> "config")
+                                       $$ decodeUtf8C
+                                       =$ linesUnboundedC
+                                       =$ concatMapC getRemoteCache
+                                       =$ sinkList
+            case configLines of
+                [x] -> return x
+                [] -> error $ "No remote-repo-cache found in Cabal config file"
+                _ -> error $ "Multiple remote-repo-cache entries found in Cabal config file"
+        else return $ c </> "packages"
+
+    let tarball = remoteCache </> "hackage.haskell.org" </> "00-index.tar"
+
+    unlessM (liftIO $ doesFileExist tarball) $
+        stackageUpdate defaultStackageUpdateSettings
+
+    return tarball
   where
     getCabalRoot :: IO FilePath
     getCabalRoot = getAppUserDataDirectory "cabal"
