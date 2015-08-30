@@ -150,7 +150,7 @@ go input name fp
     | any (F.hasExtension $ fromString fp) $ words "css js png svg gif" = void $ getName fp
     | otherwise = upload' True key $ sourceFile fp
   where
-    Just suffix = F.stripPrefix (fromString input) (fromString fp)
+    Just suffix = F.stripPrefix (fromString input F.</> "") (fromString fp)
     toRoot = concat $ asList $ replicate (length $ F.splitDirectories suffix) $ asText "../"
     key = name ++ "/" ++ pack (F.encodeString suffix)
 
