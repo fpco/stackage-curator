@@ -136,10 +136,12 @@ pbDatabase pb
     | pbGlobalInstall pb = Nothing
     | otherwise = Just $ pbInstallDest pb </> "pkgdb"
 
-pbBinDir, pbLibDir, pbDataDir, pbDocDir :: PerformBuild -> FilePath
+pbBinDir, pbLibDir, pbDataDir, pbLibexecDir, pbSysconfDir, pbDocDir :: PerformBuild -> FilePath
 pbBinDir pb = pbInstallDest pb </> "bin"
 pbLibDir pb = pbInstallDest pb </> "lib"
 pbDataDir pb = pbInstallDest pb </> "share"
+pbLibexecDir pb = pbInstallDest pb </> "libexec"
+pbSysconfDir pb = pbInstallDest pb </> "etc"
 pbDocDir pb = pbInstallDest pb </> "doc"
 
 -- | Directory keeping previous result info
@@ -342,6 +344,8 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} =
         tell' $ "--libdir=" ++ pack (pbLibDir pb)
         tell' $ "--bindir=" ++ pack (pbBinDir pb)
         tell' $ "--datadir=" ++ pack (pbDataDir pb)
+        tell' $ "--libexecdir=" ++ pack (pbLibexecDir pb)
+        tell' $ "--sysconfdir=" ++ pack (pbSysconfDir pb)
         tell' $ "--docdir=" ++ pack (pbDocDir pb </> unpack namever)
         tell' $ "--htmldir=" ++ pack (pbDocDir pb </> unpack namever)
         tell' $ "--haddockdir=" ++ pack (pbDocDir pb </> unpack namever)
