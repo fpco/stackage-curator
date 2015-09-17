@@ -397,14 +397,7 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} =
                         ]
                     return True
                 | otherwise -> return False
-
-        prevHaddockResult <- getPreviousResult pb Haddock pident
-        let needHaddock = pbEnableHaddock
-                       && checkPrevResult prevHaddockResult pcHaddocks
-                       && not (null $ sdModules $ ppDesc $ piPlan sbPackageInfo)
-                       && not pcSkipBuild
-
-        when (toBuild || needHaddock) $ withConfiged $ do
+        when toBuild $ withConfiged $ do
             deletePreviousResults pb pident
 
             log' $ "Building " ++ namever
@@ -419,10 +412,18 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} =
 
         -- Even if the tests later fail, we can allow other libraries to build
         -- on top of our successful results
-        let markDone = atomically $ putTMVar (piResult sbPackageInfo) True
-            andMarkDone = (`finally` markDone)
+        --
+        -- FIXME do we need to wait to do this until after Haddocks build?
+        -- otherwise, we could have a race condition and try to build a
+        -- dependency's haddocks before this finishes
+        atomically $ putTMVar (piResult sbPackageInfo) True
 
-        andMarkDone $ when needHaddock $ withConfiged $ do
+        prevHaddockResult <- getPreviousResult pb Haddock pident
+        let needHaddock = pbEnableHaddock
+                       && checkPrevResult prevHaddockResult pcHaddocks
+                       && not (null $ sdModules $ ppDesc $ piPlan sbPackageInfo)
+                       && not pcSkipBuild
+        when needHaddock $ withConfiged $ do
             log' $ "Haddocks " ++ namever
             hfs <- readTVarIO sbHaddockFiles
             haddockDeps <- atomically $ getHaddockDeps pbPlan sbHaddockDeps pname
