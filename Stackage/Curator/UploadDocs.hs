@@ -109,13 +109,13 @@ upload' toCompress name src = do
             eres <- liftResourceT $ tryAny $ src $$ upload toCompress env bucket name
             case eres of
                 Left e
-                    | i <= (0 :: Int) -> throwIO e
+                    | i > 10 -> throwIO e
                     | otherwise -> do
                         putStrLn $ "Exception, retrying: " ++ tshow e
-                        liftIO $ threadDelay 2000000
-                        loop $! i - 1
+                        liftIO $ threadDelay $ 2000000 * i
+                        loop $! i + 1
                 Right () -> return ()
-    loop 3
+    loop 1
 
 isHoogleFile :: FilePath -> FilePath -> Bool
 isHoogleFile input fp' = fromMaybe False $ do
