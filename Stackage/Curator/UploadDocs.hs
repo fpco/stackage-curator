@@ -44,6 +44,7 @@ import           Text.Blaze.Html               (toHtml)
 import           Text.Blaze.Html.Renderer.Utf8 (renderHtml)
 import           Text.HTML.DOM                 (eventConduit)
 import           Text.XML                      (fromEvents)
+import Control.Concurrent (threadDelay)
 
 upload :: (MonadResource m)
        => Bool -- ^ compression?
@@ -111,6 +112,7 @@ upload' toCompress name src = do
                     | i <= (0 :: Int) -> throwIO e
                     | otherwise -> do
                         putStrLn $ "Exception, retrying: " ++ tshow e
+                        liftIO $ threadDelay 2000000
                         loop $! i - 1
                 Right () -> return ()
     loop 3
