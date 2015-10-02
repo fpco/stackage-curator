@@ -31,6 +31,7 @@ import           Stackage.Prelude            hiding (pi)
 import           System.Directory            (doesDirectoryExist, doesFileExist, findExecutable)
 import qualified System.FilePath             as FP
 import           System.Environment          (getEnvironment)
+import           System.Exit
 import           System.IO                   (IOMode (WriteMode),
                                               openBinaryFile)
 import           System.IO.Temp              (withSystemTempDirectory)
@@ -431,6 +432,8 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} =
             log' $ "Haddocks " ++ namever
             hfs <- readTVarIO sbHaddockFiles
             haddockDeps <- atomically $ getHaddockDeps pbPlan sbHaddockDeps pname
+            -- See: https://github.com/commercialhaskell/stack/pull/1070/files
+            (hyped, _, _) <- readProcessWithExitCode "haddock" ["--hyperlinked-source"] ""
             let hfsOpts = map hfOpt
                         $ filter ((`member` haddockDeps) . toPackageName . fst)
                         $ mapToList hfs
@@ -448,7 +451,9 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} =
                 args = ($ hfsOpts) $ execWriter $ do
                         let tell' x = tell (x:)
                         tell' "haddock"
-                        tell' "--hyperlink-source"
+                        tell' $ if hyped == ExitSuccess
+                            then "--haddock-option=--hyperlinked-source"
+                            else "--hyperlink-source"
                         tell' "--html"
                         when pbBuildHoogle $ tell' "--hoogle"
                         tell' "--html-location=../$pkg-$version/"
