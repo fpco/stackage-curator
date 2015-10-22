@@ -150,7 +150,7 @@ go input name fp
                     yield (Nothing, EventBeginDoctype "html" Nothing)
                     yield (Nothing, EventEndDoctype)
                     mapMC $ \e -> do
-                        e' <- goEvent fp toRoot e
+                        e' <- goEvent fp toRoot packageUrl e
                         return (Nothing, e')
                     )
             $$ fromEvents
@@ -164,22 +164,31 @@ go input name fp
     Just suffix = F.stripPrefix (fromString input F.</> "") (fromString fp)
     toRoot = concat $ asList $ replicate (length $ F.splitDirectories suffix) $ asText "../"
     key = name ++ "/" ++ pack (F.encodeString suffix)
+    packageUrl = concat
+        [ "https://www.stackage.org/"
+        , name
+        , "/package/"
+        , pack $ F.encodeString suffix
+        ]
 
 goEvent :: M m
         => FilePath -- HTML file path
         -> Text -- ^ relative prefix to root
+        -> Text -- ^ package base page
         -> Event
         -> m Event
-goEvent htmlfp toRoot (EventBeginElement name attrs) =
-    EventBeginElement name <$> mapM (goAttr htmlfp toRoot) attrs
-goEvent _ _ e = return e
+goEvent htmlfp toRoot packageUrl (EventBeginElement name attrs) =
+    EventBeginElement name <$> mapM (goAttr htmlfp toRoot packageUrl) attrs
+goEvent _ _ _ e = return e
 
 goAttr :: M m
        => FilePath -- ^ HTML file path
        -> Text -- ^ relative prefix to root
+       -> Text -- ^ package base page
        -> (Name, [Content])
        -> m (Name, [Content])
-goAttr htmlfp toRoot pair@(name, [ContentText value])
+goAttr htmlfp toRoot packageUrl pair@(name, [ContentText value])
+    | name == "href" && value == "index.html" = return ("href", [ContentText packageUrl])
     | isRef name && not (".html" `isSuffixOf` value) = do
         let fp = FP.takeDirectory htmlfp </> unpack value
         exists <- liftIO $ F.isFile $ fromString fp
@@ -188,7 +197,7 @@ goAttr htmlfp toRoot pair@(name, [ContentText value])
                 x <- getName fp
                 return (name, [ContentText $ toRoot ++ x])
             else return pair
-goAttr _ _ pair = return pair
+goAttr _ _ _ pair = return pair
 
 isRef :: Name -> Bool
 isRef "href" = True
