@@ -168,7 +168,7 @@ go input name fp
         [ "https://www.stackage.org/"
         , name
         , "/package/"
-        , pack $ F.encodeString suffix
+        , takeWhile (/= '/') $ pack $ F.encodeString suffix
         ]
 
 goEvent :: M m
