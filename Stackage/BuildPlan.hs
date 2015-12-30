@@ -117,14 +117,15 @@ isAllowed bc = \name version ->
 
 mkPackagePlan :: MonadThrow m
               => BuildConstraints
-              -> GenericPackageDescription
+              -> SimplifiedPackageDescription
               -> m PackagePlan
-mkPackagePlan bc gpd = do
-    ppDesc <- toSimpleDesc CheckCond {..} gpd
+mkPackagePlan bc spd = do
+    ppDesc <- toSimpleDesc CheckCond {..} spd
     return PackagePlan {..}
   where
-    PackageIdentifier name ppVersion = package $ packageDescription gpd
-    ppGithubPings = getGithubPings bc gpd
+    name = spdName spd
+    ppVersion = spdVersion spd
+    ppGithubPings = applyGithubMapping bc $ spdGithubPings spd
     ppConstraints = bcPackageConstraints bc name
     ppUsers = mempty -- must be filled in later
 
@@ -140,9 +141,8 @@ mkPackagePlan bc gpd = do
     SystemInfo {..} = bcSystemInfo bc
 
     overrides = pcFlagOverrides ppConstraints
-    getFlag MkFlag {..} =
-        (flagName, fromMaybe flagDefault $ lookup flagName overrides)
-    flags = mapFromList $ map getFlag $ genPackageFlags gpd
+    flags = mapWithKey overrideFlag $ spdPackageFlags spd
+    overrideFlag name defVal = fromMaybe defVal $ lookup name overrides
 
 getLatestAllowedPlans :: MonadIO m => BuildConstraints -> m (Map PackageName PackagePlan)
 getLatestAllowedPlans bc =

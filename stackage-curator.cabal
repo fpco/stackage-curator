@@ -90,6 +90,8 @@ library
                      , stackage-install >= 0.1.1
                      , lucid
                      , stackage-update
+                     , binary
+                     , binary-tagged
 
 executable stackage-curator
   default-language:    Haskell2010

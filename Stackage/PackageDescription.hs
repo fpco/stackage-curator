@@ -23,38 +23,34 @@ import           Distribution.Compiler           (CompilerFlavor)
 import           Distribution.Package            (Dependency (..))
 import           Distribution.PackageDescription
 import           Distribution.System             (Arch, OS)
+import           Stackage.PackageIndex
 import           Stackage.Prelude
 
 -- | Convert a 'GenericPackageDescription' into a 'SimpleDesc' by following the
 -- constraints in the provided 'CheckCond'.
 toSimpleDesc :: MonadThrow m
              => CheckCond
-             -> GenericPackageDescription
+             -> SimplifiedPackageDescription
              -> m SimpleDesc
-toSimpleDesc cc gpd = execWriterT $ do
-    forM_ (condLibrary gpd) $ tellTree cc CompLibrary libBuildInfo getModules
-    forM_ (condExecutables gpd) $ tellTree cc CompExecutable buildInfo noModules . snd
+toSimpleDesc cc spd = execWriterT $ do
+    forM_ (spdCondLibrary spd) $ tellTree cc CompLibrary
+    forM_ (spdCondExecutables spd) $ tellTree cc CompExecutable . snd
     tell mempty { sdProvidedExes = setFromList
                                  $ map (fromString . fst)
-                                 $ condExecutables gpd
+                                 $ spdCondExecutables spd
                 }
-    when (ccIncludeTests cc) $ forM_ (condTestSuites gpd)
-        $ tellTree cc CompTestSuite testBuildInfo noModules . snd
-    when (ccIncludeBenchmarks cc) $ forM_ (condBenchmarks gpd)
-        $ tellTree cc CompBenchmark benchmarkBuildInfo noModules . snd
-  where
-    noModules = const mempty
-    getModules = setFromList . map display . exposedModules
+    when (ccIncludeTests cc) $ forM_ (spdCondTestSuites spd)
+        $ tellTree cc CompTestSuite . snd
+    when (ccIncludeBenchmarks cc) $ forM_ (spdCondBenchmarks spd)
+        $ tellTree cc CompBenchmark . snd
 
 -- | Convert a single CondTree to a 'SimpleDesc'.
 tellTree :: (MonadWriter SimpleDesc m, MonadThrow m)
          => CheckCond
          -> Component
-         -> (a -> BuildInfo)
-         -> (a -> Set Text) -- ^ get module names
-         -> CondTree ConfVar [Dependency] a
+         -> CondTree ConfVar [Dependency] SimplifiedComponentInfo
          -> m ()
-tellTree cc component getBI getModules =
+tellTree cc component =
     loop
   where
     loop (CondNode dat deps comps) = do
@@ -64,7 +60,7 @@ tellTree cc component getBI getModules =
                     { diComponents = singletonSet component
                     , diRange = simplifyVersionRange y
                     }
-            , sdTools = unionsWith (<>) $ flip map (buildTools $ getBI dat)
+            , sdTools = unionsWith (<>) $ flip map (sciBuildTools dat)
                 $ \(Dependency name range) -> singletonMap
                     -- In practice, cabal files refer to the exe name, not the
                     -- package name.
@@ -73,7 +69,7 @@ tellTree cc component getBI getModules =
                         { diComponents = singletonSet component
                         , diRange = simplifyVersionRange range
                         }
-            , sdModules = getModules dat
+            , sdModules = sciModules dat
             }
         forM_ comps $ \(cond, ontrue, onfalse) -> do
             b <- checkCond cc cond

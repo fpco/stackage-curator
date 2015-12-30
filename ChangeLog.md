@@ -1,6 +1,7 @@
 ## 0.12.0
 
 * New create-plan flags: `--add-package`, `--expect-test-failure` and `--expect-haddock-failure`
+* Package description caching
 
 ## 0.11.0
 

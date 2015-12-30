@@ -4,18 +4,23 @@
 {-# LANGUAGE GADTs             #-}
 module Stackage.GithubPings
     ( getGithubPings
+    , applyGithubMapping
     ) where
 
 import Distribution.PackageDescription
 import Stackage.BuildConstraints
 import Stackage.Prelude
 
+applyGithubMapping :: BuildConstraints -> Set Text -> Set Text
+applyGithubMapping bc =
+    foldMap (\name -> fromMaybe (singletonSet name) (lookup name (bcGithubUsers bc)))
+
 -- | Determine accounts to be pinged on Github based on various metadata in the
 -- package description.
-getGithubPings :: BuildConstraints -- ^ for mapping to pingees
-               -> GenericPackageDescription -> Set Text
-getGithubPings bc gpd =
-    foldMap (\(pack -> name) -> fromMaybe (singletonSet name) (lookup name (bcGithubUsers bc))) $
+getGithubPings :: GenericPackageDescription -> Set Text
+getGithubPings gpd =
+        setFromList $
+        map pack $
         goHomepage (homepage $ packageDescription gpd) ++
         concatMap goRepo (sourceRepos $ packageDescription gpd)
   where
