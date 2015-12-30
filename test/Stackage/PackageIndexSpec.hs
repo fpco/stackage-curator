@@ -18,4 +18,4 @@ spec = do
         length m `shouldBe` 1
         p <- simpleParse $ asText "base"
         v <- simpleParse $ asText "4.5.0.0"
-        (pkgVersion . packageId <$> m) `shouldBe` singletonMap p v
+        (spdVersion <$> m) `shouldBe` singletonMap p v
