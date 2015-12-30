@@ -68,8 +68,11 @@ data BuildFlags = BuildFlags
 createPlan :: Target
            -> FilePath
            -> [Dependency] -- ^ additional constraints
+           -> [PackageName] -- ^ newly added packages
+           -> [PackageName] -- ^ newly expected test failures
+           -> [PackageName] -- ^ newly expected haddock failures
            -> IO ()
-createPlan target dest constraints = do
+createPlan target dest constraints addPackages expectTestFailures expectHaddockFailures = do
     man <- newManager tlsManagerSettings
     putStrLn $ "Creating plan for: " ++ tshow target
     bc <-
@@ -90,10 +93,27 @@ createPlan target dest constraints = do
                 return $ updateBuildConstraints oldplan
             _ -> defaultBuildConstraints man
 
-    plan <- planFromConstraints $ setConstraints constraints bc
+    plan <- planFromConstraints
+          $ flip (foldr expectHaddockFailure) expectHaddockFailures
+          $ flip (foldr expectTestFailure) expectTestFailures
+          $ flip (foldr addPackage) addPackages
+          $ setConstraints constraints bc
 
     putStrLn $ "Writing build plan to " ++ pack dest
     encodeFile dest plan
+  where
+    -- Add a new package to the build constraints
+    addPackage :: PackageName -> BuildConstraints -> BuildConstraints
+    addPackage name bc = bc { bcPackages = insertSet name $ bcPackages bc }
+
+    expectTestFailure = tweak $ \pc -> pc { pcTests = ExpectFailure }
+    expectHaddockFailure = tweak $ \pc -> pc { pcHaddocks = ExpectFailure }
+
+    tweak f name bc = bc
+        { bcPackageConstraints = \name' ->
+            (if name == name' then f else id)
+            (bcPackageConstraints bc name')
+        }
 
 planFromConstraints :: MonadIO m => BuildConstraints -> m BuildPlan
 planFromConstraints bc = do

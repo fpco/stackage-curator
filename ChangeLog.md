@@ -1,3 +1,7 @@
+## 0.12.0
+
+* New create-plan flags: `--add-package`, `--expect-test-failure` and `--expect-haddock-failure`
+
 ## 0.11.0
 
 * Use newest version of libraries [#6](https://github.com/fpco/stackage-curator/issues/6)

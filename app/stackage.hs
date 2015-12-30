@@ -37,6 +37,9 @@ main = do
                 <$> target
                 <*> planFile
                 <*> many constraint
+                <*> many addPackage
+                <*> many expectTestFailure
+                <*> many expectHaddockFailure
                 )
         addCommand "check" "Verify that a plan is valid" id
             (checkPlan <$> (fmap Just planFile <|> pure Nothing))
@@ -253,6 +256,30 @@ main = do
         case simpleParse $ T.pack s of
             Nothing -> fail $ "Invalid constraint: " ++ s
             Just d -> return d
+
+    addPackage =
+        option packageRead
+            (long "add-package" ++
+             metavar "PACKAGE-NAME" ++
+             help "Newly added package")
+
+    expectTestFailure =
+        option packageRead
+            (long "expect-test-failure" ++
+             metavar "PACKAGE-NAME" ++
+             help "Newly expected test failures")
+
+    expectHaddockFailure =
+        option packageRead
+            (long "expect-haddock-failure" ++
+             metavar "PACKAGE-NAME" ++
+             help "Newly expected haddock failures")
+
+    packageRead = do
+        s <- str
+        case simpleParse $ T.pack s of
+            Nothing -> fail $ "Invalid package name: " ++ s
+            Just p -> return p
 
     diffsOnly =
         switch
