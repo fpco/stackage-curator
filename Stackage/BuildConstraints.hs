@@ -111,6 +111,7 @@ data ConstraintFile = ConstraintFile
     , cfGithubUsers             :: Map Text (Set Text)
     , cfSkippedLibProfiling     :: Set PackageName
     , cfGhcMajorVersion         :: Maybe (Int, Int)
+    , cfTreatAsNonCore          :: Set PackageName
     }
 
 instance FromJSON ConstraintFile where
@@ -127,6 +128,7 @@ instance FromJSON ConstraintFile where
                     . Map.mapKeysWith const Maintainer
         cfGithubUsers <- o .: "github-users"
         cfGhcMajorVersion <- o .:? "ghc-major-version" >>= mapM parseMajorVersion
+        cfTreatAsNonCore <- getPackages o "treat-as-non-core" <|> return mempty
         return ConstraintFile {..}
       where
         goFlagMap = Map.mapKeysWith const FlagName
@@ -149,9 +151,16 @@ data MismatchedGhcVersion = MismatchedGhcVersion
     deriving (Show, Typeable)
 instance Exception MismatchedGhcVersion
 
+-- | Remove the given packages from the set of core packages
+removeFromCore :: Set PackageName -> SystemInfo -> SystemInfo
+removeFromCore forceNonCore si = si
+    { siCorePackages = siCorePackages si
+      `Map.difference` mapFromList (map (, ()) $ toList forceNonCore)
+    }
+
 toBC :: ConstraintFile -> IO BuildConstraints
 toBC ConstraintFile {..} = do
-    bcSystemInfo <- getSystemInfo
+    bcSystemInfo <- removeFromCore cfTreatAsNonCore <$> getSystemInfo
     forM_ cfGhcMajorVersion $ \(major, minor) ->
         case versionBranch $ siGhcVersion bcSystemInfo of
             major':minor':_ | major == major' && minor == minor' -> return ()
