@@ -147,7 +147,7 @@ instance Show BadBuildPlan where
 
         showUser :: (PkgUser, VersionRange) -> Text
         showUser (pu, range) = concat
-            [ "- "
+            [ "- [ ] "
             , pkgUserShow1 pu
             , " ("
             -- add a space after < to avoid confusing Markdown processors (like
