@@ -348,7 +348,7 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
         : "-global-package-db"
         : (case pbDatabase pb of
             Nothing -> rest
-            Just db -> ("--package-db=" ++ pack db) : rest)
+            Just db -> ("-package-db=" ++ pack db) : rest)
 
     configArgs = ($ []) $ execWriter $ do
         when pbAllowNewer $ tell' "--allow-newer"
