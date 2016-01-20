@@ -20,6 +20,7 @@ module Stackage.BuildPlan
 
 import           Control.Monad.State.Strict      (execState, get, put)
 import qualified Data.Map                        as Map
+import qualified Data.Set                        as Set
 import qualified Distribution.Compiler
 import           Distribution.PackageDescription
 import           Stackage.BuildConstraints
@@ -31,7 +32,8 @@ import           Stackage.Prelude
 -- | Make a build plan given these package set and build constraints.
 newBuildPlan :: MonadIO m => Map PackageName PackagePlan -> BuildConstraints -> m BuildPlan
 newBuildPlan packagesOrig bc@BuildConstraints {..} = liftIO $ do
-    let toolMap = makeToolMap packagesOrig
+    let toolMap :: Map ExeName (Set PackageName)
+        toolMap = makeToolMap bcBuildToolOverrides packagesOrig
         packages = populateUsers $ removeUnincluded bc toolMap packagesOrig
         toolNames :: [ExeName]
         toolNames = concatMap (Map.keys . sdTools . ppDesc) packages
@@ -47,19 +49,25 @@ newBuildPlan packagesOrig bc@BuildConstraints {..} = liftIO $ do
         , bpTools = tools
         , bpPackages = packages
         , bpGithubUsers = bcGithubUsers
+        , bpBuildToolOverrides = bcBuildToolOverrides
         }
   where
     SystemInfo {..} = bcSystemInfo
 
-makeToolMap :: Map PackageName PackagePlan
+makeToolMap :: Map Text (Set Text) -- ^ build tool overrides
+            -> Map PackageName PackagePlan
             -> Map ExeName (Set PackageName)
-makeToolMap =
-    unionsWith (++) . map go . mapToList
+makeToolMap overrides =
+    (overrides' ++) . unionsWith (++) . map go . mapToList
   where
     go (packageName, pp) =
         foldMap go' $ sdProvidedExes $ ppDesc pp
       where
         go' exeName = singletonMap exeName (singletonSet packageName)
+
+    overrides' :: Map ExeName (Set PackageName)
+    overrides' = Map.mapKeysWith (++) ExeName
+               $ fmap (Set.map mkPackageName) overrides
 
 topologicalSortTools :: MonadThrow m
                      => Map ExeName (Set PackageName)

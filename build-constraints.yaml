@@ -2462,3 +2462,11 @@ github-users:
         - stepcut
 
 # end of github-users
+
+# begin build-tool-overrides
+
+build-tool-overrides:
+    cabal:
+        - cabal-install
+
+# end build-tool-overrides

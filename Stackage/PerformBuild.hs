@@ -172,7 +172,7 @@ performBuild' pb@PerformBuild {..} = withBuildDir $ \builddir -> do
 
     sem <- atomically $ newTSem pbJobs
     active <- newTVarIO (0 :: Int)
-    let toolMap = makeToolMap $ bpPackages pbPlan
+    let toolMap = makeToolMap (bpBuildToolOverrides pbPlan) (bpPackages pbPlan)
     packageMap <- fmap fold $ forM (mapToList $ bpPackages pbPlan)
         $ \(name, plan) -> do
             let piPlan = plan

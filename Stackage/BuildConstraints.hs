@@ -39,6 +39,12 @@ data BuildConstraints = BuildConstraints
 
     , bcGithubUsers        :: Map Text (Set Text)
     -- ^ map an account to set of pingees
+
+    , bcBuildToolOverrides :: Map Text (Set Text)
+    -- ^ map a build tool name to a set of packages we should include
+    --
+    -- Used to avoid situations like extra packages on Hackage providing the
+    -- cabal executable
     }
 
 -- | Modify the version bounds with the given Dependencies
@@ -109,6 +115,7 @@ data ConstraintFile = ConstraintFile
     , cfSkippedBenchmarks       :: Set PackageName
     , cfPackages                :: Map Maintainer (Vector Dependency)
     , cfGithubUsers             :: Map Text (Set Text)
+    , cfBuildToolOverrides      :: Map Text (Set Text)
     , cfSkippedLibProfiling     :: Set PackageName
     , cfGhcMajorVersion         :: Maybe (Int, Int)
     , cfTreatAsNonCore          :: Set PackageName
@@ -127,6 +134,7 @@ instance FromJSON ConstraintFile where
                   >>= mapM (mapM toDep)
                     . Map.mapKeysWith const Maintainer
         cfGithubUsers <- o .: "github-users"
+        cfBuildToolOverrides <- o .:? "build-tool-overrides" .!= mempty
         cfGhcMajorVersion <- o .:? "ghc-major-version" >>= mapM parseMajorVersion
         cfTreatAsNonCore <- getPackages o "treat-as-non-core" <|> return mempty
         return ConstraintFile {..}
@@ -197,3 +205,4 @@ toBC ConstraintFile {..} = do
         pcSkipBuild = name `member` cfSkippedBuilds
 
     bcGithubUsers = cfGithubUsers
+    bcBuildToolOverrides = cfBuildToolOverrides
