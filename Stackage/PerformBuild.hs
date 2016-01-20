@@ -11,6 +11,7 @@ module Stackage.PerformBuild
     , PerformBuild (..)
     , BuildException (..)
     , pbDocDir
+    , sdistFilePath
     ) where
 
 import           Control.Concurrent.Async    (async)
@@ -18,6 +19,7 @@ import           Control.Concurrent.STM.TSem
 import           Control.Monad.Writer.Strict (execWriter, tell)
 import qualified Data.Map                    as Map
 import           Data.NonNull                (fromNullable)
+import           Distribution.PackageDescription (buildType, packageDescription, BuildType (Simple))
 import           Filesystem                  (canonicalizePath, createTree,
                                               getWorkingDirectory,
                                               removeTree, rename, removeFile)
@@ -27,8 +29,10 @@ import           Stackage.BuildConstraints
 import           Stackage.BuildPlan
 import           Stackage.GhcPkg
 import           Stackage.PackageDescription
+import           Stackage.PackageIndex       (gpdFromLBS)
 import           Stackage.Prelude            hiding (pi)
-import           System.Directory            (doesDirectoryExist, doesFileExist, findExecutable)
+import           System.Directory            (doesDirectoryExist, doesFileExist, findExecutable,
+                                              getAppUserDataDirectory)
 import qualified System.FilePath             as FP
 import           System.Environment          (getEnvironment)
 import           System.Exit
@@ -265,29 +269,31 @@ data SingleBuild = SingleBuild
 singleBuild :: PerformBuild
             -> Set PackageName -- ^ registered packages
             -> SingleBuild -> IO ()
-singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} =
-      withCounter sbActive
-    $ handle updateErrs
-    $ (`finally` void (atomically $ tryPutTMVar (piResult sbPackageInfo) False))
-    $ inner
+singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
+    cabalDir <- getAppUserDataDirectory "cabal"
+    withCounter sbActive
+        $ handle updateErrs
+        $ (`finally` void (atomically $ tryPutTMVar (piResult sbPackageInfo) False))
+        $ inner cabalDir
   where
     libComps = setFromList [CompLibrary, CompExecutable]
     testComps = insertSet CompTestSuite libComps
-    inner = do
+    inner cabalDir = do
         let wfd comps =
                 waitForDeps sbToolMap sbPackageMap comps pbPlan sbPackageInfo
                 . withTSem sbSem
-        withUnpacked <- wfd libComps buildLibrary
+        withUnpacked <- wfd libComps (buildLibrary cabalDir)
 
         wfd testComps (runTests withUnpacked)
 
     pname = piName sbPackageInfo
     pident = PackageIdentifier pname (ppVersion $ piPlan sbPackageInfo)
     name = display pname
+    version = display $ ppVersion $ piPlan sbPackageInfo
     namever = concat
         [ name
         , "-"
-        , display $ ppVersion $ piPlan sbPackageInfo
+        , version
         ]
 
     runIn wdir getOutH cmd args = do
@@ -369,15 +375,21 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} =
 
     hasLib = not $ null $ sdModules $ ppDesc $ piPlan sbPackageInfo
 
-    buildLibrary = wf libOut $ \getOutH -> do
+    buildLibrary cabalDir = wf libOut $ \getOutH -> do
         let run a b = do when pbVerbose $ log' (unwords (a : b))
                          runChild getOutH a b
+            cabal args = run "runghc" $ "Setup" : args
 
         isUnpacked <- newIORef False
         let withUnpacked inner' = do
                 unlessM (readIORef isUnpacked) $ do
                     log' $ "Unpacking " ++ namever
-                    runParent getOutH "cabal" ["unpack", namever]
+                    runParent getOutH "tar"
+                        [ "xzf"
+                        , sdistFilePath cabalDir name version
+                        ]
+
+                    createSetupHs childDir name
                     writeIORef isUnpacked True
                 inner'
 
@@ -385,7 +397,7 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} =
         let withConfiged inner' = withUnpacked $ do
                 unlessM (readIORef isConfiged) $ do
                     log' $ "Configuring " ++ namever
-                    run "cabal" $ "configure" : configArgs
+                    cabal $ "configure" : configArgs
                     writeIORef isConfiged True
                 inner'
 
@@ -406,12 +418,12 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} =
             deletePreviousResults pb pident
 
             log' $ "Building " ++ namever
-            run "cabal" ["build"]
+            cabal ["build"]
 
             log' $ "Copying/registering " ++ namever
-            run "cabal" ["copy"]
+            cabal ["copy"]
             withMVar sbRegisterMutex $ const $
-                run "cabal" ["register"]
+                cabal ["register"]
 
             savePreviousResult pb Build pident True
 
@@ -458,7 +470,7 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} =
                         when pbBuildHoogle $ tell' "--hoogle"
                         tell' "--html-location=../$pkg-$version/"
 
-            eres <- tryAny $ run "cabal" args
+            eres <- tryAny $ cabal args
 
             forM_ eres $ \() -> do
                 renameOrCopy
@@ -487,6 +499,7 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} =
 
     runTests withUnpacked = wf testOut $ \getOutH -> do
         let run = runChild getOutH
+            cabal args = run "runghc" $ "Setup" : args
 
         prevTestResult <- getPreviousResult pb Test pident
         let needTest = pbEnableTests
@@ -494,14 +507,14 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} =
                     && not pcSkipBuild
         when needTest $ withUnpacked $ do
             log' $ "Test configure " ++ namever
-            run "cabal" $ "configure" : "--enable-tests" : configArgs
+            cabal $ "configure" : "--enable-tests" : configArgs
 
             eres <- tryAny $ do
                 log' $ "Test build " ++ namever
-                run "cabal" ["build"]
+                cabal ["build"]
 
                 log' $ "Test run " ++ namever
-                run "cabal" ["test", "--log=" ++ pack testRunOut]
+                cabal ["test", "--log=" ++ pack testRunOut]
 
             savePreviousResult pb Test pident $ either (const False) (const True) eres
             case (eres, pcTests) of
@@ -646,3 +659,39 @@ getHaddockDeps BuildPlan {..} var =
     isLibExe DepInfo {..} =
         CompLibrary    `member` diComponents ||
         CompExecutable `member` diComponents
+
+sdistFilePath :: IsString filepath
+              => FilePath -- ^ cabal directory
+              -> Text -- ^ package name
+              -> Text -- ^ package name
+              -> filepath
+sdistFilePath cabalDir name version = fromString
+    $ cabalDir
+  </> "packages"
+  </> "hackage.haskell.org"
+  </> unpack name
+  </> unpack version
+  </> unpack (concat [name, "-", version, ".tar.gz"])
+
+-- | Create a default Setup.hs file if the given directory is a simple build plan
+--
+-- Also deletes any Setup.lhs if necessary
+createSetupHs :: FilePath
+              -> Text -- ^ package name
+              -> IO ()
+createSetupHs dir name = do
+    simple <- isSimple cabalFP
+    when simple $ do
+        _ <- tryIO $ removeFile $ fromString setuplhs
+        writeFile setuphs $ asByteString "import Distribution.Simple\nmain = defaultMain\n"
+  where
+    cabalFP = dir </> unpack name <.> "cabal"
+    setuphs = dir </> "Setup.hs"
+    setuplhs = dir </> "Setup.lhs"
+
+-- | Check if the given cabal file has a simple build plan
+isSimple :: FilePath -> IO Bool
+isSimple fp = do
+    bs <- readFile fp
+    gpd <- gpdFromLBS fp (fromStrict bs)
+    return $ buildType (packageDescription gpd) == Just Simple

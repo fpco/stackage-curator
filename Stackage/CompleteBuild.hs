@@ -485,12 +485,7 @@ fetch planFile = do
             , version
             , ".tar.gz"
             ]
-        fp = fromString $ cabalDir </>
-             "packages" </>
-             "hackage.haskell.org" </>
-             unpack name </>
-             unpack version </>
-             unpack (concat [name, "-", version, ".tar.gz"])
+        fp = sdistFilePath cabalDir name version
 
 parMapM_ :: (MonadIO m, MonadBaseUnlift IO m, MonoFoldable mono)
          => Int

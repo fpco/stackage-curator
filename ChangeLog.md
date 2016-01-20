@@ -1,6 +1,7 @@
 ## 0.13.0
 
 * build-tool-overrides
+* Avoid using the cabal-install executable [stackage#1107](https://github.com/fpco/stackage/issues/1107)
 
 ## 0.12.0
 

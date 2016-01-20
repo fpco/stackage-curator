@@ -17,6 +17,7 @@ module Stackage.PackageIndex
     , SimplifiedPackageDescription (..)
     , SimplifiedComponentInfo (..)
     , getLatestDescriptions
+    , gpdFromLBS
     ) where
 
 import qualified Codec.Archive.Tar                     as Tar
@@ -197,17 +198,24 @@ ucfParse root (UnparsedCabalFile name version fp lbs) = liftIO $ do
     cache = root </> "cache" </> (unpack $ decodeUtf8 $ B16.encode $ SHA256.hashlazy lbs)
 
     -- Parse the desc from the contents of the .cabal file
-    parseFromText =
-        case parsePackageDescription $ unpack $ dropBOM $ decodeUtf8 lbs of
-            ParseFailed e -> throwM $ CabalParseException fp e
-            ParseOk _warnings gpd -> do
-                let pd = packageDescription gpd
-                    PackageIdentifier name' version' = package pd
-                when (name /= name' || version /= version') $
-                    throwM $ MismatchedNameVersion fp
-                        name name' version version'
-                return $ gpdToSpd gpd
+    parseFromText = do
+        gpd <- gpdFromLBS fp lbs
+        let pd = packageDescription gpd
+            PackageIdentifier name' version' = package pd
+        when (name /= name' || version /= version') $
+            throwM $ MismatchedNameVersion fp
+                name name' version version'
+        return $ gpdToSpd gpd
 
+gpdFromLBS :: MonadThrow m
+           => FilePath
+           -> LByteString
+           -> m GenericPackageDescription
+gpdFromLBS fp lbs =
+    case parsePackageDescription $ unpack $ dropBOM $ decodeUtf8 lbs of
+        ParseFailed e -> throwM $ CabalParseException fp e
+        ParseOk _warnings gpd -> return gpd
+  where
     -- https://github.com/haskell/hackage-server/issues/351
     dropBOM t = fromMaybe t $ stripPrefix "\xFEFF" t
 
