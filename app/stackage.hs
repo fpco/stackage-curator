@@ -15,8 +15,8 @@ import           Stackage.DiffPlans
 import           Stackage.InstallBuild
 import           Stackage.Prelude             hiding ((<>))
 import           Stackage.Stats
-import           Stackage.Update
 import           Stackage.Upload
+import           System.Exit                  (exitWith)
 import           System.IO                    (BufferMode (LineBuffering), hSetBuffering)
 
 main :: IO ()
@@ -30,8 +30,10 @@ main = do
         commands
   where
     commands = do
-        addCommand "update" "Update the package index" id
-            (pure $ stackageUpdate defaultStackageUpdateSettings)
+        addCommand "update" "DEPRECATED use stack update instead" id
+            (pure $ do
+                putStrLn $ pack "Deprecated, use 'stack update' directly instead"
+                rawSystem "stack" ["update"] >>= exitWith)
         addCommand "create-plan" "Generate a new plan file (possibly based on a previous LTS)" id
             (createPlan
                 <$> target

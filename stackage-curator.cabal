@@ -89,7 +89,6 @@ library
                      , stackage-metadata >= 0.3
                      , stackage-install >= 0.1.1
                      , lucid
-                     , stackage-update
                      , binary
                      , binary-tagged
 
@@ -103,7 +102,6 @@ executable stackage-curator
                      , stackage-curator
                      , optparse-applicative >= 0.11
                      , optparse-simple
-                     , stackage-update
                      , stackage-cli
                      , system-filepath
                      , http-client

@@ -33,7 +33,6 @@ import           Distribution.PackageDescription.Parse (ParseResult (..),
 import           Distribution.ParseUtils               (PError)
 import           Distribution.System                   (Arch, OS)
 import           Stackage.Prelude
-import           Stackage.Update
 import           Stackage.GithubPings
 import           System.Directory                      (doesFileExist, getAppUserDataDirectory, createDirectoryIfMissing)
 import           System.FilePath                       (takeDirectory)
@@ -47,32 +46,10 @@ import           Data.Proxy
 -- | Name of the 00-index.tar downloaded from Hackage.
 getPackageIndexPath :: MonadIO m => m FilePath
 getPackageIndexPath = liftIO $ do
-    c <- getCabalRoot
-    let configFile = c </> "config"
-    exists <- liftIO $ doesFileExist configFile
-    remoteCache <- if exists
-        then do
-            configLines <- runResourceT $ sourceFile (c </> "config")
-                                       $$ decodeUtf8C
-                                       =$ linesUnboundedC
-                                       =$ concatMapC getRemoteCache
-                                       =$ sinkList
-            case configLines of
-                [x] -> return x
-                [] -> error $ "No remote-repo-cache found in Cabal config file"
-                _ -> error $ "Multiple remote-repo-cache entries found in Cabal config file"
-        else return $ c </> "packages"
-
-    let tarball = remoteCache </> "hackage.haskell.org" </> "00-index.tar"
-
-    unlessM (liftIO $ doesFileExist tarball) $
-        stackageUpdate defaultStackageUpdateSettings
-
+    stackRoot <- getAppUserDataDirectory "stack"
+    let tarball = stackRoot </> "indices" </> "Hackage" </> "00-index.tar"
     return tarball
   where
-    getCabalRoot :: IO FilePath
-    getCabalRoot = getAppUserDataDirectory "cabal"
-
     getRemoteCache s = do
         ("remote-repo-cache", stripPrefix ":" -> Just v) <- Just $ break (== ':') s
         Just $ unpack $ T.strip v

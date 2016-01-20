@@ -459,10 +459,10 @@ fetch planFile = do
 
     plan <- decodeFileEither planFile >>= either throwM return
 
-    cabalDir <- getAppUserDataDirectory "cabal"
-    parMapM_ 8 (download man cabalDir) $ mapToList $ bpPackages plan
+    stackDir <- getAppUserDataDirectory "stack"
+    parMapM_ 8 (download man stackDir) $ mapToList $ bpPackages plan
   where
-    download man cabalDir (display -> name, display . ppVersion -> version) = do
+    download man stackDir (display -> name, display . ppVersion -> version) = do
         unlessM (isFile fp) $ do
             hPut stdout $ encodeUtf8 $ concat
                 [ "Downloading "
@@ -485,7 +485,7 @@ fetch planFile = do
             , version
             , ".tar.gz"
             ]
-        fp = sdistFilePath cabalDir name version
+        fp = sdistFilePath stackDir name version
 
 parMapM_ :: (MonadIO m, MonadBaseUnlift IO m, MonoFoldable mono)
          => Int

@@ -270,19 +270,18 @@ singleBuild :: PerformBuild
             -> Set PackageName -- ^ registered packages
             -> SingleBuild -> IO ()
 singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
-    cabalDir <- getAppUserDataDirectory "cabal"
     withCounter sbActive
         $ handle updateErrs
         $ (`finally` void (atomically $ tryPutTMVar (piResult sbPackageInfo) False))
-        $ inner cabalDir
+        $ inner
   where
     libComps = setFromList [CompLibrary, CompExecutable]
     testComps = insertSet CompTestSuite libComps
-    inner cabalDir = do
+    inner = do
         let wfd comps =
                 waitForDeps sbToolMap sbPackageMap comps pbPlan sbPackageInfo
                 . withTSem sbSem
-        withUnpacked <- wfd libComps (buildLibrary cabalDir)
+        withUnpacked <- wfd libComps buildLibrary
 
         wfd testComps (runTests withUnpacked)
 
@@ -375,7 +374,7 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
 
     hasLib = not $ null $ sdModules $ ppDesc $ piPlan sbPackageInfo
 
-    buildLibrary cabalDir = wf libOut $ \getOutH -> do
+    buildLibrary = wf libOut $ \getOutH -> do
         let run a b = do when pbVerbose $ log' (unwords (a : b))
                          runChild getOutH a b
             cabal args = run "runghc" $ "Setup" : args
@@ -384,10 +383,7 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
         let withUnpacked inner' = do
                 unlessM (readIORef isUnpacked) $ do
                     log' $ "Unpacking " ++ namever
-                    runParent getOutH "tar"
-                        [ "xzf"
-                        , sdistFilePath cabalDir name version
-                        ]
+                    runParent getOutH "stack" ["unpack", namever]
 
                     createSetupHs childDir name
                     writeIORef isUnpacked True
@@ -661,14 +657,15 @@ getHaddockDeps BuildPlan {..} var =
         CompExecutable `member` diComponents
 
 sdistFilePath :: IsString filepath
-              => FilePath -- ^ cabal directory
+              => FilePath -- ^ stack directory
               -> Text -- ^ package name
               -> Text -- ^ package name
               -> filepath
-sdistFilePath cabalDir name version = fromString
-    $ cabalDir
+sdistFilePath stackDir name version = fromString
+    $ stackDir
+  </> "indices"
+  </> "Hackage"
   </> "packages"
-  </> "hackage.haskell.org"
   </> unpack name
   </> unpack version
   </> unpack (concat [name, "-", version, ".tar.gz"])
