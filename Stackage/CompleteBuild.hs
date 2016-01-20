@@ -9,6 +9,7 @@ module Stackage.CompleteBuild
     , checkPlan
     , getStackageAuthToken
     , createPlan
+    , fetch
     , makeBundle
     , upload
     , hackageDistro
@@ -60,6 +61,7 @@ data BuildFlags = BuildFlags
     -- ^ push to Git (when doing an LTS build)
     , bfJobs             :: !(Maybe Int)
     , bfPlanFile         :: !(Maybe FilePath)
+    , bfPreBuild         :: !Bool
     , bfLoadPlan         :: !Bool
     } deriving (Show)
 
@@ -207,24 +209,27 @@ completeBuild buildType buildFlags = do
 
     pb <- getPerformBuild buildFlags settings
 
-    putStrLn "Performing build"
-    performBuild pb >>= mapM_ putStrLn
+    if bfPreBuild buildFlags
+        then prefetchPackages pb
+        else do
+            putStrLn "Performing build"
+            performBuild pb >>= mapM_ putStrLn
 
-    putStrLn $ "Creating bundle (v2) at: " ++ fpToText bundleDest
-    createBundleV2 CreateBundleV2
-        { cb2Plan = plan
-        , cb2Type = snapshotType
-        , cb2DocsDir = pbDocDir pb
-        , cb2Dest = bundleDest
-        }
+            putStrLn $ "Creating bundle (v2) at: " ++ fpToText bundleDest
+            createBundleV2 CreateBundleV2
+                { cb2Plan = plan
+                , cb2Type = snapshotType
+                , cb2DocsDir = pbDocDir pb
+                , cb2Dest = bundleDest
+                }
 
-    postBuild `catchAny` print
+            postBuild `catchAny` print
 
-    when (bfDoUpload buildFlags) $
-        finallyUpload
-            buildFlags
-            settings
-            man
+            when (bfDoUpload buildFlags) $
+                finallyUpload
+                    buildFlags
+                    settings
+                    man
 -}
 
 getStackageAuthToken :: IO Text
@@ -444,6 +449,43 @@ makeBundle
         , cb2Dest = bundleFile
         , cb2DocmapFile = docmapFile
         }
+
+fetch :: FilePath -> IO ()
+fetch planFile = do
+    man <- newManager tlsManagerSettings
+    -- First make sure to fetch all of the dependencies... just in case Hackage
+    -- has an outage. Don't feel like wasting hours of CPU time.
+    putStrLn "Pre-fetching all packages"
+
+    plan <- decodeFileEither planFile >>= either throwM return
+
+    cabalDir <- getAppUserDataDirectory "cabal"
+    parMapM_ 8 (download man cabalDir) $ mapToList $ bpPackages plan
+  where
+    download man cabalDir (display -> name, display . ppVersion -> version) = do
+        unlessM (isFile fp) $ do
+            hPut stdout $ encodeUtf8 $ concat
+                [ "Downloading "
+                , name
+                , "-"
+                , version
+                , "\n"
+                ]
+            createTree $ parent fp
+            req <- parseUrl url
+            withResponse req man $ \res -> do
+                let tmp = F.encodeString fp <.> "tmp"
+                runResourceT $ bodyReaderSource (responseBody res) $$ sinkFile tmp
+                rename (fromString tmp) fp
+      where
+        url = unpack $ concat
+            [ "https://s3.amazonaws.com/hackage.fpcomplete.com/package/"
+            , name
+            , "-"
+            , version
+            , ".tar.gz"
+            ]
+        fp = sdistFilePath cabalDir name version
 
 parMapM_ :: (MonadIO m, MonadBaseUnlift IO m, MonoFoldable mono)
          => Int

@@ -2,7 +2,6 @@
 
 * build-tool-overrides
 * Avoid using the cabal-install executable [stackage#1107](https://github.com/fpco/stackage/issues/1107)
-* Use stack for unpacking tarballs, and skip prefetching completely
 
 ## 0.12.0
 
