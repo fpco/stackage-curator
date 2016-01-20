@@ -43,8 +43,9 @@ main = do
                 )
         addCommand "check" "Verify that a plan is valid" id
             (checkPlan <$> (fmap Just planFile <|> pure Nothing))
-        addCommand "fetch" "Fetch all tarballs needed by a plan" id
-            (fetch <$> planFile)
+        addCommand "fetch" "DEPRECATED" id
+            (let fetch _ = putStrLn $ pack "fetch command is deprecated"
+              in fetch <$> planFile)
         addCommand "make-bundle" "Run a complete build and generate an upload bundle" id
             makeBundle'
         addCommand "check-target-available" "Is the given target available to be used?" id
