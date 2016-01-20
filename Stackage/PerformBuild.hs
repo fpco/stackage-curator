@@ -342,6 +342,14 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
 
         inner' getH `finally` cleanup
 
+    runghcArgs :: [Text] -> [Text]
+    runghcArgs rest =
+          "-clear-package-db"
+        : "-global-package-db"
+        : (case pbDatabase pb of
+            Nothing -> rest
+            Just db -> ("--package-db=" ++ pack db) : rest)
+
     configArgs = ($ []) $ execWriter $ do
         when pbAllowNewer $ tell' "--allow-newer"
         tell' "--package-db=clear"
@@ -377,7 +385,7 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
     buildLibrary = wf libOut $ \getOutH -> do
         let run a b = do when pbVerbose $ log' (unwords (a : b))
                          runChild getOutH a b
-            cabal args = run "runghc" $ "Setup" : args
+            cabal args = run "runghc" $ runghcArgs $ "Setup" : args
 
         isUnpacked <- newIORef False
         let withUnpacked inner' = do
@@ -495,7 +503,7 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
 
     runTests withUnpacked = wf testOut $ \getOutH -> do
         let run = runChild getOutH
-            cabal args = run "runghc" $ "Setup" : args
+            cabal args = run "runghc" $ runghcArgs $ "Setup" : args
 
         prevTestResult <- getPreviousResult pb Test pident
         let needTest = pbEnableTests
