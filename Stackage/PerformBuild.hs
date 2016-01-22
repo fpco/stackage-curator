@@ -17,6 +17,7 @@ module Stackage.PerformBuild
 import           Control.Concurrent.Async    (async)
 import           Control.Concurrent.STM.TSem
 import           Control.Monad.Writer.Strict (execWriter, tell)
+import qualified Data.ByteString             as S
 import qualified Data.Map                    as Map
 import           Data.NonNull                (fromNullable)
 import           Distribution.PackageDescription (buildType, packageDescription, BuildType (Simple),
@@ -38,7 +39,7 @@ import qualified System.FilePath             as FP
 import           System.Environment          (getEnvironment)
 import           System.Exit
 import           System.IO                   (IOMode (WriteMode),
-                                              openBinaryFile)
+                                              openBinaryFile, hFlush)
 import           System.IO.Temp              (withSystemTempDirectory)
 
 data BuildException = BuildException (Map PackageName BuildFailure) [Text]
@@ -309,12 +310,14 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
     runIn :: FilePath -> IO Handle -> Text -> [Text] -> IO ()
     runIn wdir getOutH cmd args = do
         outH <- getOutH
-        hPutStrLn outH $ concat
+        S.hPut outH $ encodeUtf8 $ concat
             [ "> "
             , pack wdir
             , "$ "
             , unwords $ map quote $ cmd : args
+            , "\n"
             ]
+        hFlush outH
         withCheckedProcess (cp outH) $ \ClosedStream UseProvidedHandle UseProvidedHandle ->
             (return () :: IO ())
       where
