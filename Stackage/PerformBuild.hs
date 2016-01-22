@@ -19,7 +19,8 @@ import           Control.Concurrent.STM.TSem
 import           Control.Monad.Writer.Strict (execWriter, tell)
 import qualified Data.Map                    as Map
 import           Data.NonNull                (fromNullable)
-import           Distribution.PackageDescription (buildType, packageDescription, BuildType (Simple))
+import           Distribution.PackageDescription (buildType, packageDescription, BuildType (Simple),
+                                                 testName, testEnabled, testSuites)
 import           Filesystem                  (canonicalizePath, createTree,
                                               getWorkingDirectory,
                                               removeTree, rename, removeFile)
@@ -295,12 +296,29 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
         , version
         ]
 
+    quote :: Text -> Text
+    quote s
+        | any special s = tshow s
+        | otherwise = s
+      where
+        special ' ' = True
+        special '\'' = True
+        special '"' = True
+        special _ = False
+
+    runIn :: FilePath -> IO Handle -> Text -> [Text] -> IO ()
     runIn wdir getOutH cmd args = do
         outH <- getOutH
+        hPutStrLn outH $ concat
+            [ "> "
+            , pack wdir
+            , "$ "
+            , unwords $ map quote $ cmd : args
+            ]
         withCheckedProcess (cp outH) $ \ClosedStream UseProvidedHandle UseProvidedHandle ->
             (return () :: IO ())
       where
-        cp outH = (proc (unpack $ asText cmd) (map (unpack . asText) args))
+        cp outH = (proc (unpack cmd) (map unpack args))
             { cwd = Just wdir
             , std_out = UseHandle outH
             , std_err = UseHandle outH
@@ -323,7 +341,6 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
             ]
     libOut = pbLogDir </> unpack namever </> "build.out"
     testOut = pbLogDir </> unpack namever </> "test.out"
-    testRunOut = pbLogDir </> unpack namever </> "test-run.out"
 
     wf fp inner' = do
         ref <- newIORef Nothing
@@ -387,18 +404,24 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
                          runChild getOutH a b
             cabal args = run "runghc" $ runghcArgs $ "Setup" : args
 
-        isUnpacked <- newIORef False
+        gpdRef <- newIORef Nothing
         let withUnpacked inner' = do
-                unlessM (readIORef isUnpacked) $ do
-                    log' $ "Unpacking " ++ namever
-                    runParent getOutH "stack" ["unpack", namever]
+                mgpd <- readIORef gpdRef
+                gpd <-
+                    case mgpd of
+                        Just gpd -> return gpd
+                        Nothing -> do
+                            log' $ "Unpacking " ++ namever
+                            runParent getOutH "stack" ["unpack", namever]
 
-                    createSetupHs childDir name
-                    writeIORef isUnpacked True
-                inner'
+                            gpd <- createSetupHs childDir name
+                            writeIORef gpdRef $ Just gpd
+
+                            return gpd
+                inner' gpd
 
         isConfiged <- newIORef False
-        let withConfiged inner' = withUnpacked $ do
+        let withConfiged inner' = withUnpacked $ \_gpd -> do
                 unlessM (readIORef isConfiged) $ do
                     log' $ "Configuring " ++ namever
                     cabal $ "configure" : configArgs
@@ -509,7 +532,7 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
         let needTest = pbEnableTests
                     && checkPrevResult prevTestResult pcTests
                     && not pcSkipBuild
-        when needTest $ withUnpacked $ do
+        when needTest $ withUnpacked $ \gpd -> do
             log' $ "Test configure " ++ namever
             cabal $ "configure" : "--enable-tests" : configArgs
 
@@ -517,8 +540,20 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
                 log' $ "Test build " ++ namever
                 cabal ["build"]
 
-                log' $ "Test run " ++ namever
-                cabal ["test", "--log=" ++ pack testRunOut]
+                let tests = map testName
+                          $ filter testEnabled
+                          $ testSuites
+                          $ packageDescription gpd
+                forM_ tests $ \test -> do
+                    log' $ concat
+                        [ "Test run "
+                        , namever
+                        , " ("
+                        , pack test
+                        , ")"
+                        ]
+                    let exe = pack $ "dist/build" </> test </> test
+                    run exe []
 
             savePreviousResult pb Test pident $ either (const False) (const True) eres
             case (eres, pcTests) of
@@ -683,20 +718,16 @@ sdistFilePath stackDir name version = fromString
 -- Also deletes any Setup.lhs if necessary
 createSetupHs :: FilePath
               -> Text -- ^ package name
-              -> IO ()
+              -> IO GenericPackageDescription
 createSetupHs dir name = do
-    simple <- isSimple cabalFP
+    bs <- readFile cabalFP
+    gpd <- gpdFromLBS cabalFP (fromStrict bs)
+    let simple = buildType (packageDescription gpd) == Just Simple
     when simple $ do
         _ <- tryIO $ removeFile $ fromString setuplhs
         writeFile setuphs $ asByteString "import Distribution.Simple\nmain = defaultMain\n"
+    return gpd
   where
     cabalFP = dir </> unpack name <.> "cabal"
     setuphs = dir </> "Setup.hs"
     setuplhs = dir </> "Setup.lhs"
-
--- | Check if the given cabal file has a simple build plan
-isSimple :: FilePath -> IO Bool
-isSimple fp = do
-    bs <- readFile fp
-    gpd <- gpdFromLBS fp (fromStrict bs)
-    return $ buildType (packageDescription gpd) == Just Simple
