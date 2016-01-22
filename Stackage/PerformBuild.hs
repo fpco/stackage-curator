@@ -20,7 +20,7 @@ import           Control.Monad.Writer.Strict (execWriter, tell)
 import qualified Data.Map                    as Map
 import           Data.NonNull                (fromNullable)
 import           Distribution.PackageDescription (buildType, packageDescription, BuildType (Simple),
-                                                 testName, testEnabled, testSuites)
+                                                 condTestSuites)
 import           Filesystem                  (canonicalizePath, createTree,
                                               getWorkingDirectory,
                                               removeTree, rename, removeFile)
@@ -540,10 +540,7 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
                 log' $ "Test build " ++ namever
                 cabal ["build"]
 
-                let tests = map testName
-                          $ filter testEnabled
-                          $ testSuites
-                          $ packageDescription gpd
+                let tests = map fst $ condTestSuites gpd
                 forM_ tests $ \test -> do
                     log' $ concat
                         [ "Test run "
@@ -553,6 +550,8 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
                         , ")"
                         ]
                     let exe = pack $ "dist/build" </> test </> test
+                    -- FIXME: may want to put in some logic to test if the
+                    -- executable exists
                     run exe []
 
             savePreviousResult pb Test pident $ either (const False) (const True) eres
