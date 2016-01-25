@@ -99,7 +99,7 @@ waitForDeps :: Map ExeName (Set PackageName)
             -> IO a
 waitForDeps toolMap packageMap activeComps bp pi action = do
     atomically $ do
-        mapM_ checkPackage $ Map.keys $ filterUnused $ sdPackages $ ppDesc $ piPlan pi
+        mapM_ checkPackage $ addCabal $ Map.keysSet $ filterUnused $ sdPackages $ ppDesc $ piPlan pi
         forM_ (Map.keys $ filterUnused $ sdTools $ ppDesc $ piPlan pi) $ \exe -> do
             case lookup exe toolMap >>= fromNullable . map checkPackage . setToList of
                 Nothing
@@ -128,6 +128,11 @@ waitForDeps toolMap packageMap activeComps bp pi action = do
 
     isCore = (`member` siCorePackages (bpSystemInfo bp))
     isCoreExe = (`member` siCoreExecutables (bpSystemInfo bp))
+
+    -- Since we build every package using the Cabal library, it's an implicit
+    -- dependency of everything
+    addCabal :: Set PackageName -> Set PackageName
+    addCabal = insertSet (PackageName "Cabal")
 
 withCounter :: TVar Int -> IO a -> IO a
 withCounter counter = bracket_
