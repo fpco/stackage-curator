@@ -557,10 +557,15 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
                         , pack test
                         , ")"
                         ]
-                    let exe = pack $ "dist/build" </> test </> test
-                    -- FIXME: may want to put in some logic to test if the
-                    -- executable exists
-                    run exe []
+                    let exe = "dist/build" </> test </> test
+
+                    exists <- liftIO $ doesFileExist $ childDir </> exe
+                    if exists
+                        then run (pack exe) []
+                        else do
+                            outH <- getOutH
+                            hPutStrLn outH $ "Test suite not built: " ++ test
+                            hFlush outH
 
             savePreviousResult pb Test pident $ either (const False) (const True) eres
             case (eres, pcTests) of
