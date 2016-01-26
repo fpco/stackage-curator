@@ -142,7 +142,7 @@ instance Show BadBuildPlan where
             [ display dep
             , "-"
             , display version
-            , " depended on by:"
+            , " is out of bounds for:"
             ]
 
         showUser :: (PkgUser, VersionRange) -> Text
