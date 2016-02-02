@@ -41,6 +41,7 @@ import           System.Exit
 import           System.IO                   (IOMode (WriteMode),
                                               openBinaryFile, hFlush)
 import           System.IO.Temp              (withSystemTempDirectory)
+import           System.Timeout              (timeout)
 
 data BuildException = BuildException (Map PackageName BuildFailure) [Text]
     deriving Typeable
@@ -561,7 +562,16 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
 
                     exists <- liftIO $ doesFileExist $ childDir </> exe
                     if exists
-                        then run (pack exe) []
+                        then do
+                            mres <- timeout maximumTestSuiteTime $ run (pack exe) []
+                            case mres of
+                                Just () -> return ()
+                                Nothing -> error $ concat
+                                    [ "Test suite timed out: "
+                                    , unpack namever
+                                    , ":"
+                                    , test
+                                    ]
                         else do
                             outH <- getOutH
                             hPutStrLn outH $ "Test suite not built: " ++ test
@@ -587,6 +597,10 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
             case fromException exc of
                 Just bf -> bf
                 Nothing -> BuildFailureException exc
+
+-- | Maximum time (in microseconds) to run a single test suite
+maximumTestSuiteTime :: Int
+maximumTestSuiteTime = 10 * 60 * 1000 * 1000 -- ten minutes
 
 renameOrCopy :: FilePath -> FilePath -> IO ()
 renameOrCopy src dest =
