@@ -1,3 +1,7 @@
+## 0.13.1
+
+* Let test suite pass when no package index available [stackage#1165](https://github.com/fpco/stackage/issues/1165)
+
 ## 0.13.0
 
 * build-tool-overrides
