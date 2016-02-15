@@ -324,8 +324,18 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
             , "\n"
             ]
         hFlush outH
-        withCheckedProcess (cp outH) $ \ClosedStream UseProvidedHandle UseProvidedHandle ->
-            (return () :: IO ())
+
+        -- instead of using withCheckedProcess, we go lower-level so that we
+        -- can kill the process in the case of an async exception (via the
+        -- timeout call below)
+        let cp' = cp outH
+        (ClosedStream, UseProvidedHandle, UseProvidedHandle, sph)
+            <- streamingProcess cp'
+        ec <- waitForStreamingProcess sph `onException` do
+            -- Call the process
+            let ph = streamingProcessHandleRaw sph
+            terminateProcess ph
+        unless (ec == ExitSuccess) $ throwIO $ ProcessExitedUnsuccessfully cp' ec
       where
         cp outH = (proc (unpack cmd) (map unpack args))
             { cwd = Just wdir
