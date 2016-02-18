@@ -293,7 +293,8 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
     testComps = insertSet CompTestSuite libComps
 
     inner
-      | pname == PackageName "Cabal" && pbNoRebuildCabal = return ()
+      | pname == PackageName "Cabal" && pbNoRebuildCabal =
+            atomically $ putTMVar (piResult sbPackageInfo) True
       | otherwise = do
         let wfd comps =
                 waitForDeps sbToolMap sbPackageMap comps pbPlan sbPackageInfo
