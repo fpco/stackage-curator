@@ -1,6 +1,5 @@
-## 0.14.0
+## 0.13.2
 
-* Remove no-longer-relevant allow-newer flag (doesn't work with Setup.hs)
 * --no-rebuild-cabal
 
 ## 0.13.1

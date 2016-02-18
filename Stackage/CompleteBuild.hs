@@ -408,11 +408,13 @@ makeBundle
     -> Bool -- ^ enable library profiling?
     -> Bool -- ^ enable executable dynamic?
     -> Bool -- ^ verbose?
+    -> Bool -- ^ allow-newer?
     -> Bool -- ^ no rebuild cabal?
     -> IO ()
 makeBundle
   planFile docmapFile bundleFile target mjobs skipTests skipHaddocks skipHoogle
-  enableLibraryProfiling enableExecutableDynamic verbose noRebuildCabal
+  enableLibraryProfiling enableExecutableDynamic verbose allowNewer
+  noRebuildCabal
         = do
     plan <- decodeFileEither planFile >>= either throwM return
     jobs <- maybe getNumCapabilities return mjobs
@@ -431,6 +433,7 @@ makeBundle
             , pbEnableLibProfiling = enableLibraryProfiling
             , pbEnableExecDyn = enableExecutableDynamic
             , pbVerbose = verbose
+            , pbAllowNewer = allowNewer
             , pbBuildHoogle = not skipHoogle
             , pbNoRebuildCabal = noRebuildCabal
             }
