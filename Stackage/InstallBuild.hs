@@ -35,6 +35,7 @@ data InstallFlags = InstallFlags
     , ifVerbose            :: !Bool
     , ifSkipCheck          :: !Bool
     , ifBuildHoogle        :: !Bool
+    , ifNoRebuildCabal     :: !Bool
     } deriving (Show)
 
 -- | Source for build plan.
@@ -57,6 +58,7 @@ getPerformBuild plan InstallFlags{..} =
     , pbEnableExecDyn      = ifEnableExecDyn
     , pbVerbose            = ifVerbose
     , pbBuildHoogle        = ifBuildHoogle
+    , pbNoRebuildCabal     = ifNoRebuildCabal
     }
 
 -- | Install stackage from an existing build plan.

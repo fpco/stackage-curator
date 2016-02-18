@@ -408,10 +408,11 @@ makeBundle
     -> Bool -- ^ enable library profiling?
     -> Bool -- ^ enable executable dynamic?
     -> Bool -- ^ verbose?
+    -> Bool -- ^ no rebuild cabal?
     -> IO ()
 makeBundle
   planFile docmapFile bundleFile target mjobs skipTests skipHaddocks skipHoogle
-  enableLibraryProfiling enableExecutableDynamic verbose
+  enableLibraryProfiling enableExecutableDynamic verbose noRebuildCabal
         = do
     plan <- decodeFileEither planFile >>= either throwM return
     jobs <- maybe getNumCapabilities return mjobs
@@ -431,6 +432,7 @@ makeBundle
             , pbEnableExecDyn = enableExecutableDynamic
             , pbVerbose = verbose
             , pbBuildHoogle = not skipHoogle
+            , pbNoRebuildCabal = noRebuildCabal
             }
 
     putStrLn "Performing build"

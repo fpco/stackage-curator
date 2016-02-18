@@ -81,6 +81,9 @@ data PerformBuild = PerformBuild
     -- ^ Should we build Hoogle database?
     --
     -- May be disabled due to: https://ghc.haskell.org/trac/ghc/ticket/9921
+    , pbNoRebuildCabal     :: !Bool
+    -- ^ Ignore new Cabal version from the plan and use whatever's in the
+    -- database. Useful for testing pre-release GHCs
     }
 
 data PackageInfo = PackageInfo
@@ -283,7 +286,10 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
   where
     libComps = setFromList [CompLibrary, CompExecutable]
     testComps = insertSet CompTestSuite libComps
-    inner = do
+
+    inner
+      | pname == PackageName "Cabal" && pbNoRebuildCabal = return ()
+      | otherwise = do
         let wfd comps =
                 waitForDeps sbToolMap sbPackageMap comps pbPlan sbPackageInfo
                 . withTSem sbSem

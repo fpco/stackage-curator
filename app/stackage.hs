@@ -85,6 +85,7 @@ main = do
         <*> enableLibraryProfiling
         <*> enableExecutableDynamic
         <*> verbose
+        <*> noRebuildCabal
 
 
     installFlags :: Parser InstallFlags
@@ -147,7 +148,13 @@ main = do
             not
             (switch
                  (long "skip-hoogle" <>
-                  help "Skip generating Hoogle input files"))
+                  help "Skip generating Hoogle input files")) <*>
+        noRebuildCabal
+
+    noRebuildCabal =
+        switch
+            (long "no-rebuild-cabal" <>
+             help "Ignore new Cabal version from the plan and use whatever's in the database. Useful for testing pre-release GHCs")
 
     jobs =
         (fmap Just (option
