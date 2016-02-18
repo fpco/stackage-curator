@@ -77,8 +77,6 @@ data PerformBuild = PerformBuild
     , pbEnableLibProfiling :: Bool
     , pbEnableExecDyn      :: Bool
     , pbVerbose            :: Bool
-    , pbAllowNewer         :: Bool
-    -- ^ Pass --allow-newer to cabal configure
     , pbBuildHoogle        :: Bool
     -- ^ Should we build Hoogle database?
     --
@@ -387,7 +385,6 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
             Just db -> ("-package-db=" ++ pack db) : rest)
 
     configArgs = ($ []) $ execWriter $ do
-        when pbAllowNewer $ tell' "--allow-newer"
         tell' "--package-db=clear"
         tell' "--package-db=global"
         forM_ (pbDatabase pb) $ \db -> tell' $ "--package-db=" ++ pack db

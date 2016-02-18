@@ -85,7 +85,6 @@ main = do
         <*> enableLibraryProfiling
         <*> enableExecutableDynamic
         <*> verbose
-        <*> allowNewer
 
 
     installFlags :: Parser InstallFlags
@@ -186,11 +185,6 @@ main = do
         switch
             (long "verbose" ++ short 'v' ++
              help "Output verbose detail about the build steps")
-
-    allowNewer =
-        switch
-            (long "allow-newer" ++
-             help "Pass --allow-newer to cabal configure (useful when skipping checks)")
 
     target :: Parser Target
     target = option readTarget

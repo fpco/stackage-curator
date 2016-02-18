@@ -56,7 +56,6 @@ getPerformBuild plan InstallFlags{..} =
     , pbEnableLibProfiling = ifEnableLibProfiling
     , pbEnableExecDyn      = ifEnableExecDyn
     , pbVerbose            = ifVerbose
-    , pbAllowNewer         = ifSkipCheck
     , pbBuildHoogle        = ifBuildHoogle
     }
 

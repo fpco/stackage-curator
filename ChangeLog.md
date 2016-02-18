@@ -1,3 +1,7 @@
+## 0.14.0
+
+* Remove no-longer-relevant allow-newer flag (doesn't work with Setup.hs)
+
 ## 0.13.1
 
 * Let test suite pass when no package index available [stackage#1165](https://github.com/fpco/stackage/issues/1165)
