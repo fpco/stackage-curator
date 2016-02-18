@@ -18,7 +18,7 @@ import           Control.Concurrent.Async    (async)
 import           Control.Concurrent.STM.TSem
 import           Control.Monad.Writer.Strict (execWriter, tell)
 import qualified Data.ByteString             as S
-import           Data.Generics.Aliases       (mkT)
+import           Data.Generics               (mkT, everywhere)
 import qualified Data.Map                    as Map
 import           Data.NonNull                (fromNullable)
 import           Distribution.PackageDescription (buildType, packageDescription, BuildType (Simple),
@@ -787,4 +787,4 @@ createSetupHs dir name allowNewer = do
 
 -- | Strip all version bounds from a GenericPackageDescription
 stripVersionBounds :: GenericPackageDescription -> GenericPackageDescription
-stripVersionBounds = mkT (const anyVersion)
+stripVersionBounds = everywhere $ mkT $ const anyVersion
