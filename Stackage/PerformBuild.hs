@@ -23,6 +23,7 @@ import qualified Data.Map                    as Map
 import           Data.NonNull                (fromNullable)
 import           Distribution.PackageDescription (buildType, packageDescription, BuildType (Simple),
                                                  condTestSuites)
+import           Distribution.Package        (Dependency (..))
 import           Distribution.PackageDescription.PrettyPrint (writeGenericPackageDescription)
 import           Distribution.Version        (anyVersion)
 import           Filesystem                  (canonicalizePath, createTree,
@@ -787,4 +788,4 @@ createSetupHs dir name allowNewer = do
 
 -- | Strip all version bounds from a GenericPackageDescription
 stripVersionBounds :: GenericPackageDescription -> GenericPackageDescription
-stripVersionBounds = everywhere $ mkT $ const anyVersion
+stripVersionBounds = everywhere $ mkT $ \(Dependency name _) -> Dependency name anyVersion
