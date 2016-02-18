@@ -18,10 +18,13 @@ import           Control.Concurrent.Async    (async)
 import           Control.Concurrent.STM.TSem
 import           Control.Monad.Writer.Strict (execWriter, tell)
 import qualified Data.ByteString             as S
+import           Data.Generics.Aliases       (mkT)
 import qualified Data.Map                    as Map
 import           Data.NonNull                (fromNullable)
 import           Distribution.PackageDescription (buildType, packageDescription, BuildType (Simple),
                                                  condTestSuites)
+import           Distribution.PackageDescription.PrettyPrint (writeGenericPackageDescription)
+import           Distribution.Version        (anyVersion)
 import           Filesystem                  (canonicalizePath, createTree,
                                               getWorkingDirectory,
                                               removeTree, rename, removeFile)
@@ -78,7 +81,7 @@ data PerformBuild = PerformBuild
     , pbEnableExecDyn      :: Bool
     , pbVerbose            :: Bool
     , pbAllowNewer         :: Bool
-    -- ^ Pass --allow-newer to cabal configure
+    -- ^ Strip out version bounds in .cabal files
     , pbBuildHoogle        :: Bool
     -- ^ Should we build Hoogle database?
     --
@@ -393,7 +396,6 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
             Just db -> ("-package-db=" ++ pack db) : rest)
 
     configArgs = ($ []) $ execWriter $ do
-        when pbAllowNewer $ tell' "--allow-newer"
         tell' "--package-db=clear"
         tell' "--package-db=global"
         forM_ (pbDatabase pb) $ \db -> tell' $ "--package-db=" ++ pack db
@@ -439,7 +441,7 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
                             log' $ "Unpacking " ++ namever
                             runParent getOutH "stack" ["unpack", namever]
 
-                            gpd <- createSetupHs childDir name
+                            gpd <- createSetupHs childDir name pbAllowNewer
                             writeIORef gpdRef $ Just gpd
 
                             return gpd
@@ -760,10 +762,18 @@ sdistFilePath stackDir name version = fromString
 -- Also deletes any Setup.lhs if necessary
 createSetupHs :: FilePath
               -> Text -- ^ package name
+              -> Bool -- ^ allow newer?
               -> IO GenericPackageDescription
-createSetupHs dir name = do
+createSetupHs dir name allowNewer = do
     bs <- readFile cabalFP
-    gpd <- gpdFromLBS cabalFP (fromStrict bs)
+    gpd' <- gpdFromLBS cabalFP (fromStrict bs)
+    gpd <-
+        if allowNewer
+            then do
+                let gpd = stripVersionBounds gpd'
+                writeGenericPackageDescription cabalFP gpd
+                return gpd
+            else return gpd'
     let simple = buildType (packageDescription gpd) == Just Simple
     when simple $ do
         _ <- tryIO $ removeFile $ fromString setuplhs
@@ -773,3 +783,7 @@ createSetupHs dir name = do
     cabalFP = dir </> unpack name <.> "cabal"
     setuphs = dir </> "Setup.hs"
     setuplhs = dir </> "Setup.lhs"
+
+-- | Strip all version bounds from a GenericPackageDescription
+stripVersionBounds :: GenericPackageDescription -> GenericPackageDescription
+stripVersionBounds = mkT (const anyVersion)

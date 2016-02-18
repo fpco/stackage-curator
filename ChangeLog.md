@@ -1,6 +1,7 @@
 ## 0.13.2
 
 * --no-rebuild-cabal
+* Fix allow-newer by simply stripping all version bounds in .cabal files
 
 ## 0.13.1
 

@@ -91,6 +91,7 @@ library
                      , lucid
                      , binary
                      , binary-tagged
+                     , syb
 
 executable stackage-curator
   default-language:    Haskell2010
