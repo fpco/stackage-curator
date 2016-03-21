@@ -134,8 +134,16 @@ mkPackagePlan bc spd = do
     name = spdName spd
     ppVersion = spdVersion spd
     ppGithubPings = applyGithubMapping bc $ spdGithubPings spd
-    ppConstraints = bcPackageConstraints bc name
+    ppConstraints = onlyRelevantFlags $ bcPackageConstraints bc name
     ppUsers = mempty -- must be filled in later
+
+    -- Only include flags that are actually provided by the package. For more
+    -- information, see: https://github.com/fpco/stackage-curator/issues/11
+    onlyRelevantFlags :: PackageConstraints -> PackageConstraints
+    onlyRelevantFlags pc = pc
+        { pcFlagOverrides = pcFlagOverrides pc `intersection`
+                            spdPackageFlags spd
+        }
 
     ccPackageName = name
     ccOS = siOS
