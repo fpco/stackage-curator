@@ -29,38 +29,44 @@ checkBuildPlan BuildPlan {..}
     allPackages = map (,mempty) (siCorePackages bpSystemInfo) ++
                   map (ppVersion &&& M.keys . M.filter libAndExe . sdPackages . ppDesc) bpPackages
     errs@(BadBuildPlan errs') =
-        execWriter $ mapM_ (checkDeps allPackages) $ mapToList bpPackages
+        execWriter $ mapM_ (checkDeps getMaint allPackages) $ mapToList bpPackages
     -- Only looking at libraries and executables, benchmarks and tests
     -- are allowed to create cycles (e.g. test-framework depends on
     -- text, which uses test-framework in its test-suite).
     libAndExe (DepInfo cs _) = any (flip elem [CompLibrary,CompExecutable]) cs
+
+    getMaint :: PackageName -> Maybe Maintainer
+    getMaint pn = do
+        pp <- lookup pn bpPackages
+        pcMaintainer $ ppConstraints pp
 
 -- | For a given package name and plan, check that its dependencies are:
 --
 -- 1. Existent (existing in the provided package map)
 -- 2. Within version range
 -- 3. Check for dependency cycles.
-checkDeps :: Map PackageName (Version,[PackageName])
+checkDeps :: (PackageName -> Maybe Maintainer)
+          -> Map PackageName (Version,[PackageName])
           -> (PackageName, PackagePlan)
           -> Writer BadBuildPlan ()
-checkDeps allPackages (user, pb) =
+checkDeps getMaint allPackages (user, pb) =
     mapM_ go $ mapToList $ sdPackages $ ppDesc pb
   where
     go (dep, diRange -> range) =
         case lookup dep allPackages of
-            Nothing -> tell $ BadBuildPlan $ singletonMap (dep, Nothing) errMap
+            Nothing -> tell $ BadBuildPlan $ singletonMap (dep, getMaint dep, Nothing) errMap
             Just (version,deps)
                 | version `withinRange` range ->
                     occursCheck allPackages
                                 (\d v ->
                                      tell $ BadBuildPlan $ singletonMap
-                                     (d,v)
+                                     (d, getMaint dep, v)
                                      errMap)
                                 dep
                                 deps
                                 []
                 | otherwise -> tell $ BadBuildPlan $ singletonMap
-                    (dep, Just version)
+                    (dep, getMaint dep, Just version)
                     errMap
       where
         errMap = singletonMap pu range
@@ -124,25 +130,40 @@ pkgUserShow2 PkgUser {..} = unwords
     : map (cons '@') (setToList puGithubPings)
 
 newtype BadBuildPlan =
-    BadBuildPlan (Map (PackageName, Maybe Version) (Map PkgUser VersionRange))
+    BadBuildPlan (Map (PackageName, Maybe Maintainer, Maybe Version) (Map PkgUser VersionRange))
     deriving Typeable
 instance Exception BadBuildPlan
 instance Show BadBuildPlan where
     show (BadBuildPlan errs) =
         unpack $ concatMap go $ mapToList errs
       where
-        go ((dep, mdepVer), users) = unlines
+        go ((dep, mmaint, mdepVer), users) = unlines
             $ ""
-            : showDepVer dep mdepVer
+            : showDepVer dep mmaint mdepVer
             : map showUser (mapToList users)
 
-        showDepVer :: PackageName -> Maybe Version -> Text
-        showDepVer dep Nothing = display dep ++ " (not present) depended on by:"
-        showDepVer dep (Just version) = concat
+        showDepVer :: PackageName
+                   -> Maybe Maintainer
+                   -> Maybe Version
+                   -> Text
+        showDepVer dep mmaint Nothing = T.concat
+            [ display dep
+            , displayMaint mmaint
+            , " (not present) depended on by:"
+            ]
+        showDepVer dep mmaint (Just version) = concat
             [ display dep
             , "-"
             , display version
+            , displayMaint mmaint
             , " is out of bounds for:"
+            ]
+
+        displayMaint Nothing = ""
+        displayMaint (Just (Maintainer t)) = T.concat
+            [ " ("
+            , t
+            , ")"
             ]
 
         showUser :: (PkgUser, VersionRange) -> Text
