@@ -86,7 +86,6 @@ library
                      , cryptohash
                      , cryptohash-conduit
                      , resourcet
-                     , stackage-metadata >= 0.3
                      , stackage-install >= 0.1.1
                      , lucid
                      , binary

@@ -62,6 +62,7 @@ data UnparsedCabalFile = UnparsedCabalFile
     , ucfVersion :: Version
     , ucfPath    :: FilePath
     , ucfContent :: LByteString
+    , ucfEntry   :: Tar.Entry
     }
 
 data SimplifiedComponentInfo = SimplifiedComponentInfo
@@ -161,7 +162,7 @@ ucfParse :: MonadIO m
          => FilePath -- ^ ~/.stackage/curator
          -> UnparsedCabalFile
          -> m SimplifiedPackageDescription
-ucfParse root (UnparsedCabalFile name version fp lbs) = liftIO $ do
+ucfParse root (UnparsedCabalFile name version fp lbs _entry) = liftIO $ do
     eres <- tryIO $ Bin.taggedDecodeFileOrFail cache
     case eres of
         Right (Right x) -> return x
@@ -219,6 +220,7 @@ sourcePackageIndex = do
                 , ucfVersion = version
                 , ucfPath = Tar.entryPath e
                 , ucfContent = lbs
+                , ucfEntry = e
                 }
         | otherwise = return ()
 

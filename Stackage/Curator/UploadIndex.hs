@@ -12,8 +12,7 @@ import Data.Yaml                 (decodeFileEither)
 import Stackage.BuildConstraints
 import Stackage.BuildPlan
 import Stackage.Prelude
-import Stackage.Install (defaultIndexLocation)
-import Stackage.PackageIndex.Conduit
+import Stackage.PackageIndex
 import qualified Codec.Archive.Tar as Tar
 import Data.Conduit.Lazy (lazyConsume)
 import Codec.Compression.GZip (compress)
@@ -33,9 +32,9 @@ uploadIndex bpFile target bucket prefix = do
     let toInclude = getToInclude bp
     runResourceT $ do
         entries <- lazyConsume
-            $  sourceAllCabalFiles defaultIndexLocation
+            $  sourcePackageIndex
             $= filterC toInclude
-            $= mapC cfeEntry
+            $= mapC ucfEntry
         let lbs = compress $ Tar.write entries
             key = concat
                 [ prefix
@@ -44,11 +43,11 @@ uploadIndex bpFile target bucket prefix = do
                 ]
         sourceLazy lbs $$ upload False env bucket key
 
-getToInclude :: BuildPlan -> CabalFileEntry -> Bool
+getToInclude :: BuildPlan -> UnparsedCabalFile -> Bool
 getToInclude bp =
     go
   where
-    go cfe = lookup (cfeName cfe) packages == Just (cfeVersion cfe)
+    go cfe = lookup (ucfName cfe) packages == Just (ucfVersion cfe)
 
     packages = siCorePackages (bpSystemInfo bp) ++
                (ppVersion <$> bpPackages bp)
