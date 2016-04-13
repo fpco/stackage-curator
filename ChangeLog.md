@@ -2,6 +2,7 @@
 
 * --no-rebuild-cabal
 * Fix allow-newer by simply stripping all version bounds in .cabal files
+* Fix build failure [#13](https://github.com/fpco/stackage-curator/issues/13)
 
 ## 0.13.1
 

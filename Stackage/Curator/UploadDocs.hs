@@ -11,7 +11,7 @@ module Stackage.Curator.UploadDocs
     ( uploadDocs
     , upload
     ) where
-import           ClassyPrelude.Conduit
+import           ClassyPrelude.Conduit         hiding (threadDelay)
 import qualified Codec.Archive.Tar             as Tar
 import qualified Codec.Archive.Tar.Entry       as Tar
 import           Control.Monad.Trans.Resource  (liftResourceT)
