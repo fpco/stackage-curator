@@ -33,7 +33,7 @@ import Stackage.BuildConstraints
 import Stackage.BuildPlan
 import Stackage.CheckBuildPlan
 import Stackage.PerformBuild
-import Stackage.Prelude
+import Stackage.Prelude          hiding (threadDelay, getNumCapabilities)
 import Stackage.ServerBundle
 import Stackage.UpdateBuildPlan
 import Stackage.Upload
