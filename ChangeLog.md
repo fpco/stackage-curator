@@ -1,3 +1,11 @@
+## 0.13.3
+
+Move away from outdated stackage-metadata
+
+We already have local package index functionality, which uses the
+correct index. See:
+https://groups.google.com/d/msg/stackage/bf1xewtp9oo/MUB2K20OJQAJ
+
 ## 0.13.2
 
 * --no-rebuild-cabal
