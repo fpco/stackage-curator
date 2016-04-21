@@ -1,3 +1,7 @@
+## 0.14.0
+
+* Move stackage-types into this package
+
 ## 0.13.3
 
 Move away from outdated stackage-metadata
