@@ -2,6 +2,7 @@
 
 * Move stackage-types into this package
 * Move stackage-build-plan into this package
+* Start building benchmarks [stackage#1372](https://github.com/fpco/stackage/issues/1372)
 
 ## 0.13.3
 

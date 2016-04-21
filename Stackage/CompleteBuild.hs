@@ -48,6 +48,7 @@ import System.Directory (doesDirectoryExist, doesFileExist)
 -- | Flags passed in from the command line.
 data BuildFlags = BuildFlags
     { bfEnableTests      :: !Bool
+    , bfEnableBenches    :: !Bool
     , bfEnableHaddock    :: !Bool
     , bfDoUpload         :: !Bool
     , bfEnableLibProfile :: !Bool
@@ -70,9 +71,10 @@ createPlan :: Target
            -> [Dependency] -- ^ additional constraints
            -> [PackageName] -- ^ newly added packages
            -> [PackageName] -- ^ newly expected test failures
+           -> [PackageName] -- ^ newly expected bench failures
            -> [PackageName] -- ^ newly expected haddock failures
            -> IO ()
-createPlan target dest constraints addPackages expectTestFailures expectHaddockFailures = do
+createPlan target dest constraints addPackages expectTestFailures expectBenchFailures expectHaddockFailures = do
     man <- newManager tlsManagerSettings
     putStrLn $ "Creating plan for: " ++ tshow target
     bc <-
@@ -96,6 +98,7 @@ createPlan target dest constraints addPackages expectTestFailures expectHaddockF
     plan <- planFromConstraints
           $ flip (foldr expectHaddockFailure) expectHaddockFailures
           $ flip (foldr expectTestFailure) expectTestFailures
+          $ flip (foldr expectBenchFailure) expectBenchFailures
           $ flip (foldr addPackage) addPackages
           $ setConstraints constraints bc
 
@@ -107,6 +110,7 @@ createPlan target dest constraints addPackages expectTestFailures expectHaddockF
     addPackage name bc = bc { bcPackages = insertSet name $ bcPackages bc }
 
     expectTestFailure = tweak $ \pc -> pc { pcTests = ExpectFailure }
+    expectBenchFailure = tweak $ \pc -> pc { pcBenches = ExpectFailure }
     expectHaddockFailure = tweak $ \pc -> pc { pcHaddocks = ExpectFailure }
 
     tweak f name bc = bc
@@ -403,6 +407,7 @@ makeBundle
     -> Target
     -> Maybe Int -- ^ jobs
     -> Bool -- ^ skip tests?
+    -> Bool -- ^ skip benches?
     -> Bool -- ^ skip haddock?
     -> Bool -- ^ skip hoogle?
     -> Bool -- ^ enable library profiling?
@@ -412,7 +417,7 @@ makeBundle
     -> Bool -- ^ no rebuild cabal?
     -> IO ()
 makeBundle
-  planFile docmapFile bundleFile target mjobs skipTests skipHaddocks skipHoogle
+  planFile docmapFile bundleFile target mjobs skipTests skipBenches skipHaddocks skipHoogle
   enableLibraryProfiling enableExecutableDynamic verbose allowNewer
   noRebuildCabal
         = do
@@ -429,6 +434,7 @@ makeBundle
             , pbJobs = jobs
             , pbGlobalInstall = False
             , pbEnableTests = not skipTests
+            , pbEnableBenches = not skipBenches
             , pbEnableHaddock = not skipHaddocks
             , pbEnableLibProfiling = enableLibraryProfiling
             , pbEnableExecDyn = enableExecutableDynamic

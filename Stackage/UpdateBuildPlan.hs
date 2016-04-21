@@ -33,7 +33,7 @@ updateBuildConstraints BuildPlan {..} =
         , pcMaintainer = moldPC >>= pcMaintainer
         , pcTests = maybe ExpectSuccess pcTests moldPC
         , pcHaddocks = maybe ExpectSuccess pcHaddocks moldPC
-        , pcBuildBenchmarks = maybe True pcBuildBenchmarks moldPC
+        , pcBenches = maybe ExpectSuccess pcBenches moldPC
         , pcFlagOverrides = maybe mempty pcFlagOverrides moldPC
         , pcEnableLibProfile = maybe True pcEnableLibProfile moldPC
         , pcSkipBuild = maybe False pcSkipBuild moldPC

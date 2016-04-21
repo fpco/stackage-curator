@@ -41,6 +41,7 @@ main = do
                 <*> many constraint
                 <*> many addPackage
                 <*> many expectTestFailure
+                <*> many expectBenchFailure
                 <*> many expectHaddockFailure
                 )
         addCommand "check" "Verify that a plan is valid" id
@@ -80,6 +81,7 @@ main = do
         <*> target
         <*> jobs
         <*> skipTests
+        <*> skipBenches
         <*> skipHaddock
         <*> skipHoogle
         <*> enableLibraryProfiling
@@ -131,6 +133,11 @@ main = do
         fmap
             not
             (switch
+                (long "skip-benches" <>
+                 help "Skip building the benchmarks")) <*>
+        fmap
+            not
+            (switch
                  (long "skip-haddock" <>
                   help "Skip generating haddock documentation")) <*>
         switch
@@ -168,6 +175,11 @@ main = do
         switch
             (long "skip-tests" ++
              help "Skip build and running the test suites")
+
+    skipBenches =
+        switch
+            (long "skip-benches" ++
+             help "Skip building the benchmarks")
 
     skipHaddock =
         switch
@@ -277,6 +289,12 @@ main = do
             (long "expect-test-failure" ++
              metavar "PACKAGE-NAME" ++
              help "Newly expected test failures")
+
+    expectBenchFailure =
+        option packageRead
+            (long "expect-bench-failure" ++
+             metavar "PACKAGE-NAME" ++
+             help "Newly expected benchmark build failures")
 
     expectHaddockFailure =
         option packageRead

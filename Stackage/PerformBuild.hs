@@ -77,6 +77,7 @@ data PerformBuild = PerformBuild
     , pbGlobalInstall :: Bool
     -- ^ Register packages in the global database
     , pbEnableTests        :: Bool
+    , pbEnableBenches      :: Bool
     , pbEnableHaddock      :: Bool
     , pbEnableLibProfiling :: Bool
     , pbEnableExecDyn      :: Bool
@@ -292,6 +293,7 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
   where
     libComps = setFromList [CompLibrary, CompExecutable]
     testComps = insertSet CompTestSuite libComps
+    benchComps = insertSet CompBenchmark libComps
 
     inner
       | pname == PackageName "Cabal" && pbNoRebuildCabal =
@@ -303,6 +305,7 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
         withUnpacked <- wfd libComps buildLibrary
 
         wfd testComps (runTests withUnpacked)
+        wfd benchComps (buildBenches withUnpacked)
 
     pname = piName sbPackageInfo
     pident = PackageIdentifier pname (ppVersion $ piPlan sbPackageInfo)
@@ -371,6 +374,7 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
             ]
     libOut = pbLogDir </> unpack namever </> "build.out"
     testOut = pbLogDir </> unpack namever </> "test.out"
+    benchOut = pbLogDir </> unpack namever </> "bench.out"
 
     wf fp inner' = do
         ref <- newIORef Nothing
@@ -603,6 +607,30 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
                 (Right (), ExpectFailure) -> warn $ namever ++ ": unexpected test success"
                 _ -> return ()
 
+    buildBenches withUnpacked = wf benchOut $ \getOutH -> do
+        let run = runChild getOutH
+            cabal args = run "runghc" $ runghcArgs $ "Setup" : args
+
+        prevBenchResult <- getPreviousResult pb Bench pident
+        let needTest = pbEnableBenches
+                    && checkPrevResult prevBenchResult pcBenches
+                    && not pcSkipBuild
+        when needTest $ withUnpacked $ \gpd -> do
+            log' $ "Benchmark configure " ++ namever
+            cabal $ "configure" : "--enable-benchmarks" : configArgs
+
+            eres <- tryAny $ do
+                log' $ "Benchmark build " ++ namever
+                cabal ["build"]
+
+                log' "We do not currently run benchmarks"
+
+            savePreviousResult pb Bench pident $ either (const False) (const True) eres
+            case (eres, pcBenches) of
+                (Left e, ExpectSuccess) -> throwM e
+                (Right (), ExpectFailure) -> warn $ namever ++ ": unexpected benchmark success"
+                _ -> return ()
+
     warn t = atomically $ modifyTVar sbWarningsVar (. (t:))
 
     updateErrs exc = do
@@ -640,7 +668,7 @@ copyBuiltInHaddocks docdir = do
 ------------- Previous results
 
 -- | The previous actions that can be run
-data ResultType = Build | Haddock | Test
+data ResultType = Build | Haddock | Test | Bench
     deriving (Show, Enum, Eq, Ord, Bounded, Read)
 
 -- | The result generated on a previous run

@@ -152,7 +152,7 @@ mkPackagePlan bc spd = do
     ccCompilerVersion = siGhcVersion
     ccFlags = flags
     ccIncludeTests = pcTests ppConstraints /= Don'tBuild
-    ccIncludeBenchmarks = pcBuildBenchmarks ppConstraints
+    ccIncludeBenchmarks = pcBenches ppConstraints /= Don'tBuild
 
     SystemInfo {..} = bcSystemInfo bc
 

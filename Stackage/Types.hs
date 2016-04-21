@@ -213,8 +213,8 @@ data PackageConstraints = PackageConstraints
     { pcVersionRange     :: VersionRange
     , pcMaintainer       :: Maybe Maintainer
     , pcTests            :: TestState
+    , pcBenches          :: TestState
     , pcHaddocks         :: TestState
-    , pcBuildBenchmarks  :: Bool
     , pcFlagOverrides    :: Map FlagName Bool
     , pcEnableLibProfile :: Bool
     , pcSkipBuild        :: Bool
@@ -227,8 +227,15 @@ instance ToJSON PackageConstraints where
     toJSON PackageConstraints {..} = object $ addMaintainer
         [ "version-range" .= display pcVersionRange
         , "tests" .= pcTests
+        , "benches" .= pcBenches
+
+        -- for backwards compatibility
+        , "build-benchmarks" .=
+            case pcBenches of
+              Don'tBuild -> False
+              _          -> True
+
         , "haddocks" .= pcHaddocks
-        , "build-benchmarks" .= pcBuildBenchmarks
         , "flags" .= Map.mapKeysWith const unFlagName pcFlagOverrides
         , "library-profiling" .= pcEnableLibProfile
         , "skip-build" .= pcSkipBuild
@@ -240,8 +247,11 @@ instance FromJSON PackageConstraints where
         pcVersionRange <- (o .: "version-range")
                       >>= either (fail . show) return . simpleParse
         pcTests <- o .: "tests"
+        pcBenches <- o .: "benches" <|>
+          -- Compatibility with old build-benchmarks boolean
+          ((\x -> if x then ExpectFailure else Don'tBuild)
+             <$> (o .: "build-benchmarks"))
         pcHaddocks <- o .: "haddocks"
-        pcBuildBenchmarks <- o .: "build-benchmarks"
         pcFlagOverrides <- Map.mapKeysWith const mkFlagName <$> o .: "flags"
         pcMaintainer <- o .:? "maintainer"
         pcEnableLibProfile <- fmap (fromMaybe True) (o .:? "library-profiling")

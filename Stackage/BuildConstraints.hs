@@ -111,6 +111,7 @@ data ConstraintFile = ConstraintFile
     , cfSkippedTests            :: Set PackageName
     , cfSkippedBuilds           :: Set PackageName
     , cfExpectedTestFailures    :: Set PackageName
+    , cfExpectedBenchFailures   :: Set PackageName
     , cfExpectedHaddockFailures :: Set PackageName
     , cfSkippedBenchmarks       :: Set PackageName
     , cfPackages                :: Map Maintainer (Vector Dependency)
@@ -127,6 +128,8 @@ instance FromJSON ConstraintFile where
         cfSkippedTests <- getPackages o "skipped-tests"
         cfSkippedBuilds <- getPackages o "skipped-builds" <|> return mempty
         cfExpectedTestFailures <- getPackages o "expected-test-failures"
+        cfExpectedBenchFailures <- getPackages o "expected-bench-failures"
+                               <|> pure mempty -- backwards compat
         cfExpectedHaddockFailures <- getPackages o "expected-haddock-failures"
         cfSkippedBenchmarks <- getPackages o "skipped-benchmarks"
         cfSkippedLibProfiling <- getPackages o "skipped-profiling"
@@ -196,7 +199,10 @@ toBC ConstraintFile {..} = do
             | name `member` cfSkippedTests = Don'tBuild
             | name `member` cfExpectedTestFailures = ExpectFailure
             | otherwise = ExpectSuccess
-        pcBuildBenchmarks = name `notMember` cfSkippedBenchmarks
+        pcBenches
+            | name `member` cfSkippedBenchmarks = Don'tBuild
+            | name `member` cfExpectedBenchFailures = ExpectFailure
+            | otherwise = ExpectSuccess
         pcHaddocks
             | name `member` cfExpectedHaddockFailures = ExpectFailure
 
