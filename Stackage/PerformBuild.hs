@@ -623,8 +623,6 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
                 log' $ "Benchmark build " ++ namever
                 cabal ["build"]
 
-                log' "We do not currently run benchmarks"
-
             savePreviousResult pb Bench pident $ either (const False) (const True) eres
             case (eres, pcBenches) of
                 (Left e, ExpectSuccess) -> throwM e
