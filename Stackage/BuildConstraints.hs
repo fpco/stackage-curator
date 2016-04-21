@@ -128,7 +128,7 @@ instance FromJSON ConstraintFile where
         cfSkippedTests <- getPackages o "skipped-tests"
         cfSkippedBuilds <- getPackages o "skipped-builds" <|> return mempty
         cfExpectedTestFailures <- getPackages o "expected-test-failures"
-        cfExpectedBenchFailures <- getPackages o "expected-bench-failures"
+        cfExpectedBenchFailures <- getPackages o "expected-benchmark-failures"
                                <|> pure mempty -- backwards compat
         cfExpectedHaddockFailures <- getPackages o "expected-haddock-failures"
         cfSkippedBenchmarks <- getPackages o "skipped-benchmarks"
