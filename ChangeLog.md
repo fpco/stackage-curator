@@ -1,6 +1,7 @@
 ## 0.14.0
 
 * Move stackage-types into this package
+* Move stackage-build-plan into this package
 
 ## 0.13.3
 
