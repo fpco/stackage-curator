@@ -415,11 +415,12 @@ makeBundle
     -> Bool -- ^ verbose?
     -> Bool -- ^ allow-newer?
     -> Bool -- ^ no rebuild cabal?
+    -> Bool -- ^ cabal from head?
     -> IO ()
 makeBundle
   planFile docmapFile bundleFile target mjobs skipTests skipBenches skipHaddocks skipHoogle
   enableLibraryProfiling enableExecutableDynamic verbose allowNewer
-  noRebuildCabal
+  noRebuildCabal cabalFromHead
         = do
     plan <- decodeFileEither planFile >>= either throwM return
     jobs <- maybe getNumCapabilities return mjobs
@@ -442,6 +443,7 @@ makeBundle
             , pbAllowNewer = allowNewer
             , pbBuildHoogle = not skipHoogle
             , pbNoRebuildCabal = noRebuildCabal
+            , pbCabalFromHead = cabalFromHead
             }
 
     putStrLn "Performing build"

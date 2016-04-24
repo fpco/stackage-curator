@@ -89,6 +89,7 @@ main = do
         <*> verbose
         <*> allowNewer
         <*> noRebuildCabal
+        <*> cabalFromHead
 
 
     installFlags :: Parser InstallFlags
@@ -163,6 +164,11 @@ main = do
         switch
             (long "no-rebuild-cabal" <>
              help "Ignore new Cabal version from the plan and use whatever's in the database. Useful for testing pre-release GHCs")
+
+    cabalFromHead =
+        switch
+            (long "cabal-from-head" <>
+             help "Get the latest Cabal from Git HEAD, used for testing Cabal itself")
 
     jobs =
         (fmap Just (option

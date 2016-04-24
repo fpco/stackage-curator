@@ -91,6 +91,9 @@ data PerformBuild = PerformBuild
     , pbNoRebuildCabal     :: !Bool
     -- ^ Ignore new Cabal version from the plan and use whatever's in the
     -- database. Useful for testing pre-release GHCs
+    , pbCabalFromHead      :: !Bool
+    -- ^ Used for testing Cabal itself: grab the most recent version of Cabal
+    -- from Github master
     }
 
 data PackageInfo = PackageInfo
@@ -295,8 +298,10 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
     testComps = insertSet CompTestSuite libComps
     benchComps = insertSet CompBenchmark libComps
 
+    thisIsCabal = pname == PackageName "Cabal" -- cue Sparta joke
+
     inner
-      | pname == PackageName "Cabal" && pbNoRebuildCabal =
+      | thisIsCabal && pbNoRebuildCabal =
             atomically $ putTMVar (piResult sbPackageInfo) True
       | otherwise = do
         let wfd comps =
@@ -358,8 +363,6 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
             , env = Just sbModifiedEnv
             }
     runParent = runIn sbBuildDir
-    runChild = runIn childDir
-    childDir = sbBuildDir </> unpack namever
 
     log' t = do
         i <- readTVarIO sbActive
@@ -433,33 +436,43 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
     hasLib = not $ null $ sdModules $ ppDesc $ piPlan sbPackageInfo
 
     buildLibrary = wf libOut $ \getOutH -> do
-        let run a b = do when pbVerbose $ log' (unwords (a : b))
-                         runChild getOutH a b
-            cabal args = run "runghc" $ runghcArgs $ "Setup" : args
-
         gpdRef <- newIORef Nothing
         let withUnpacked inner' = do
                 mgpd <- readIORef gpdRef
-                gpd <-
+                (gpd, childDir) <-
                     case mgpd of
-                        Just gpd -> return gpd
+                        Just x -> return x
                         Nothing -> do
-                            log' $ "Unpacking " ++ namever
-                            runParent getOutH "stack" ["unpack", namever]
+                            childDir <- if thisIsCabal && pbCabalFromHead
+                                then do
+                                    log' "Getting most recent Cabal from Git"
+                                    runParent getOutH "git"
+                                        [ "clone"
+                                        , "https://github.com/haskell/cabal"
+                                        ]
+                                    return $ sbBuildDir </> "cabal" </> "Cabal"
+                                else do
+                                    log' $ "Unpacking " ++ namever
+                                    runParent getOutH "stack" ["unpack", namever]
+                                    return $ sbBuildDir </> unpack namever
 
                             gpd <- createSetupHs childDir name pbAllowNewer
-                            writeIORef gpdRef $ Just gpd
+                            writeIORef gpdRef $ Just (gpd, childDir)
 
-                            return gpd
-                inner' gpd
+                            return (gpd, childDir)
+                inner' gpd childDir
 
         isConfiged <- newIORef False
-        let withConfiged inner' = withUnpacked $ \_gpd -> do
+        let withConfiged inner' = withUnpacked $ \_gpd childDir -> do
+                let run a b = do when pbVerbose $ log' (unwords (a : b))
+                                 runIn childDir getOutH a b
+                    cabal args = run "runghc" $ runghcArgs $ "Setup" : args
+
                 unlessM (readIORef isConfiged) $ do
                     log' $ "Configuring " ++ namever
                     cabal $ "configure" : configArgs
                     writeIORef isConfiged True
-                inner'
+                inner' childDir cabal
 
         prevBuildResult <- getPreviousResult pb Build pident
         toBuild <- case () of
@@ -474,7 +487,7 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
                         ]
                     return True
                 | otherwise -> return False
-        when toBuild $ withConfiged $ do
+        when toBuild $ withConfiged $ \_childDir cabal -> do
             deletePreviousResults pb pident
 
             log' $ "Building " ++ namever
@@ -500,7 +513,7 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
                        && checkPrevResult prevHaddockResult pcHaddocks
                        && not (null $ sdModules $ ppDesc $ piPlan sbPackageInfo)
                        && not pcSkipBuild
-        when needHaddock $ withConfiged $ do
+        when needHaddock $ withConfiged $ \childDir cabal -> do
             log' $ "Haddocks " ++ namever
             hfs <- readTVarIO sbHaddockFiles
             haddockDeps <- atomically $ getHaddockDeps pbPlan sbHaddockDeps pname
@@ -558,14 +571,14 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
         return withUnpacked
 
     runTests withUnpacked = wf testOut $ \getOutH -> do
-        let run = runChild getOutH
-            cabal args = run "runghc" $ runghcArgs $ "Setup" : args
-
         prevTestResult <- getPreviousResult pb Test pident
         let needTest = pbEnableTests
                     && checkPrevResult prevTestResult pcTests
                     && not pcSkipBuild
-        when needTest $ withUnpacked $ \gpd -> do
+        when needTest $ withUnpacked $ \gpd childDir -> do
+            let run = runIn childDir getOutH
+                cabal args = run "runghc" $ runghcArgs $ "Setup" : args
+
             log' $ "Test configure " ++ namever
             cabal $ "configure" : "--enable-tests" : configArgs
 
@@ -608,14 +621,14 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
                 _ -> return ()
 
     buildBenches withUnpacked = wf benchOut $ \getOutH -> do
-        let run = runChild getOutH
-            cabal args = run "runghc" $ runghcArgs $ "Setup" : args
-
         prevBenchResult <- getPreviousResult pb Bench pident
         let needTest = pbEnableBenches
                     && checkPrevResult prevBenchResult pcBenches
                     && not pcSkipBuild
-        when needTest $ withUnpacked $ \gpd -> do
+        when needTest $ withUnpacked $ \gpd childDir -> do
+            let run = runIn childDir getOutH
+                cabal args = run "runghc" $ runghcArgs $ "Setup" : args
+
             log' $ "Benchmark configure " ++ namever
             cabal $ "configure" : "--enable-benchmarks" : configArgs
 

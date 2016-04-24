@@ -62,6 +62,7 @@ getPerformBuild plan InstallFlags{..} =
     , pbAllowNewer         = ifSkipCheck
     , pbBuildHoogle        = ifBuildHoogle
     , pbNoRebuildCabal     = ifNoRebuildCabal
+    , pbCabalFromHead      = False
     }
 
 -- | Install stackage from an existing build plan.
