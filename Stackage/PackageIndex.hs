@@ -33,15 +33,20 @@ import           Distribution.PackageDescription.Parse (ParseResult (..),
 import           Distribution.ParseUtils               (PError)
 import           Distribution.System                   (Arch, OS)
 import           Stackage.Prelude
+import           Stackage.Types                        (CabalFileInfo (..))
 import           Stackage.GithubPings
 import           System.Directory                      (doesFileExist, getAppUserDataDirectory, createDirectoryIfMissing)
 import           System.FilePath                       (takeDirectory)
 import qualified Data.Binary                           as Bin (Binary)
+import           Data.Binary.Orphans                   ()
 import qualified Data.Binary.Tagged                    as Bin
 import qualified Data.ByteString.Base16                as B16
 import qualified Crypto.Hash.SHA256                    as SHA256
 import           Language.Haskell.Extension            (Extension, Language, KnownExtension)
 import           Data.Proxy
+import           Crypto.Hash                 (MD5 (..), SHA1 (..), SHA256 (..),
+                                              SHA512 (..), Skein512_512 (..), hashlazy,
+                                              Digest, HashAlgorithm, digestToHexByteString)
 
 -- | Name of the 00-index.tar downloaded from Hackage.
 getPackageIndexPath :: MonadIO m => m FilePath
@@ -77,6 +82,7 @@ instance Bin.HasSemanticVersion SimplifiedComponentInfo
 data SimplifiedPackageDescription = SimplifiedPackageDescription
     { spdName :: PackageName
     , spdVersion :: Version
+    , spdCabalFileInfo :: CabalFileInfo
     , spdCondLibrary :: Maybe (CondTree ConfVar [Dependency] SimplifiedComponentInfo)
     , spdCondExecutables :: [(String, CondTree ConfVar [Dependency] SimplifiedComponentInfo)]
     , spdCondTestSuites :: [(String, CondTree ConfVar [Dependency] SimplifiedComponentInfo)]
@@ -124,10 +130,26 @@ instance Bin.HasStructuralInfo VersionRange
 instance Bin.HasStructuralInfo FlagName
 -- END orphans
 
-gpdToSpd :: GenericPackageDescription -> SimplifiedPackageDescription
-gpdToSpd gpd = SimplifiedPackageDescription
+gpdToSpd :: LByteString -- ^ raw cabal file contents
+         -> GenericPackageDescription -> SimplifiedPackageDescription
+gpdToSpd raw gpd = SimplifiedPackageDescription
     { spdName = name
     , spdVersion = version
+    , spdCabalFileInfo = CabalFileInfo
+        { cfiSize = length raw
+        , cfiHashes =
+            let go :: (Show ha, HashAlgorithm ha) => ha -> (Text, Text)
+                go constr = (tshow constr, unwrap constr (hashlazy raw))
+                unwrap :: ha -> Digest ha -> Text
+                unwrap _ = decodeUtf8 . digestToHexByteString
+             in mapFromList
+                    [ go SHA1
+                    , go SHA256
+                    , go SHA512
+                    , go Skein512_512
+                    , go MD5
+                    ]
+        }
     , spdCondLibrary = fmap (mapCondTree simpleLib) $ condLibrary gpd
     , spdCondExecutables = map (fmap $ mapCondTree simpleExe) $ condExecutables gpd
     , spdCondTestSuites = map (fmap $ mapCondTree simpleTest) $ condTestSuites gpd
@@ -183,7 +205,7 @@ ucfParse root (UnparsedCabalFile name version fp lbs _entry) = liftIO $ do
         when (name /= name' || version /= version') $
             throwM $ MismatchedNameVersion fp
                 name name' version version'
-        return $ gpdToSpd gpd
+        return $ gpdToSpd lbs gpd
 
 gpdFromLBS :: MonadThrow m
            => FilePath

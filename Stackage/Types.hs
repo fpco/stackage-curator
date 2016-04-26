@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveDataTypeable         #-}
+{-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE RecordWildCards            #-}
@@ -19,6 +20,7 @@ module Stackage.Types
     , SimpleDesc (..)
     , DepInfo (..)
     , Component (..)
+    , CabalFileInfo (..)
       -- * Helper functions
     , display
     , simpleParse
@@ -59,6 +61,10 @@ import qualified Distribution.Text               as DT
 import           Distribution.Version            (Version, VersionRange)
 import qualified Distribution.Version            as C
 import Safe (readMay)
+import qualified Data.Binary                           as Bin (Binary)
+import qualified Data.Binary.Tagged                    as Bin
+import qualified Data.ByteString.Base16                as B16
+import GHC.Generics (Generic)
 
 data SnapshotType = STNightly
                   | STNightly2 !Day
@@ -153,6 +159,7 @@ instance FromJSON BuildPlan where
 
 data PackagePlan = PackagePlan
     { ppVersion     :: Version
+    , ppCabalFileInfo :: Maybe CabalFileInfo
     , ppGithubPings :: Set Text
     , ppUsers       :: Set PackageName
     , ppConstraints :: PackageConstraints
@@ -162,6 +169,7 @@ data PackagePlan = PackagePlan
 
 instance ToJSON PackagePlan where
     toJSON PackagePlan {..} = object
+        $ maybe id (\cfi -> (("cabal-file-info" .= cfi):)) ppCabalFileInfo $
         [ "version"      .= asText (display ppVersion)
         , "github-pings" .= ppGithubPings
         , "users"        .= Set.map unPackageName ppUsers
@@ -173,11 +181,34 @@ instance FromJSON PackagePlan where
         ppVersion <- o .: "version"
                  >>= either (fail . show) return
                    . simpleParse . asText
+        ppCabalFileInfo <- o .:? "cabal-file-info"
         ppGithubPings <- o .:? "github-pings" .!= mempty
         ppUsers <- Set.map PackageName <$> (o .:? "users" .!= mempty)
         ppConstraints <- o .: "constraints"
         ppDesc <- o .: "description"
         return PackagePlan {..}
+
+-- | Information on the contents of a cabal file
+data CabalFileInfo = CabalFileInfo
+    { cfiSize :: !Int
+    -- ^ File size in bytes
+    , cfiHashes :: !(Map.Map Text Text)
+    -- ^ Various hashes of the file contents
+    }
+    deriving (Show, Eq, Generic)
+instance Bin.Binary CabalFileInfo
+instance Bin.HasStructuralInfo CabalFileInfo
+instance Bin.HasSemanticVersion CabalFileInfo
+instance ToJSON CabalFileInfo where
+    toJSON CabalFileInfo {..} = object
+        [ "size" .= cfiSize
+        , "hashes" .= cfiHashes
+        ]
+instance FromJSON CabalFileInfo where
+    parseJSON = withObject "CabalFileInfo" $ \o -> do
+        cfiSize <- o .: "size"
+        cfiHashes <- o .: "hashes"
+        return CabalFileInfo {..}
 
 display :: DT.Text a => a -> Text
 display = fromString . DT.display

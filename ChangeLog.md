@@ -4,6 +4,7 @@
 * Move stackage-build-plan into this package
 * Start building benchmarks [stackage#1372](https://github.com/fpco/stackage/issues/1372)
 * Add cabal-from-head
+* Include cabal file size and hash info
 
 ## 0.13.3
 

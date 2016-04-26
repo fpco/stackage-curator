@@ -91,6 +91,7 @@ library
                      , lucid
                      , binary
                      , binary-tagged
+                     , binary-orphans
                      , syb
                      , safe
                      , vector

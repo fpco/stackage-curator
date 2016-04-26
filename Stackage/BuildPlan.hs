@@ -133,6 +133,7 @@ mkPackagePlan bc spd = do
   where
     name = spdName spd
     ppVersion = spdVersion spd
+    ppCabalFileInfo = Just $ spdCabalFileInfo spd
     ppGithubPings = applyGithubMapping bc $ spdGithubPings spd
     ppConstraints = onlyRelevantFlags $ bcPackageConstraints bc name
     ppUsers = mempty -- must be filled in later

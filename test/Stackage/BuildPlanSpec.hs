@@ -109,6 +109,7 @@ makePackageSet ps _ =
         dummyPackage v deps =
             PackagePlan
                 {ppVersion = Version v []
+                ,ppCabalFileInfo = Nothing
                 ,ppGithubPings = mempty
                 ,ppUsers = mempty
                 ,ppConstraints =
