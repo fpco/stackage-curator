@@ -167,20 +167,16 @@ instance Show BadBuildPlan where
             ]
 
         showUser :: (PkgUser, VersionRange) -> Text
-        showUser (pu, range) = lessThanFix $ concat
+        showUser (pu, range) = concat
             [ "- [ ] "
             , pkgUserShow1 pu
             , " ("
+            -- add a space after < to avoid confusing Markdown processors (like
+            -- Github's issue tracker)
             , T.replace "<" "< " $ display range
             , "). "
             , pkgUserShow2 pu
             ]
-
-        -- Due to a bug in Github-flavored Markdown
-        -- (https://github.com/mojombo/github-flavored-markdown/issues/60),
-        -- replace < with `<`. See:
-        -- https://github.com/fpco/stackage-curator/issues/14
-        lessThanFix = T.replace "<" "`<`"
 
 instance Monoid BadBuildPlan where
     mempty = BadBuildPlan mempty
