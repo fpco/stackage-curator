@@ -47,6 +47,7 @@ import           Data.Proxy
 import           Crypto.Hash                 (MD5 (..), SHA1 (..), SHA256 (..),
                                               SHA512 (..), Skein512_512 (..), hashlazy,
                                               Digest, HashAlgorithm, digestToHexByteString)
+import qualified Crypto.Hash.SHA1 as SHA1
 
 -- | Name of the 00-index.tar downloaded from Hackage.
 getPackageIndexPath :: MonadIO m => m FilePath
@@ -148,6 +149,12 @@ gpdToSpd raw gpd = SimplifiedPackageDescription
                     , go SHA512
                     , go Skein512_512
                     , go MD5
+                    , ("GitSHA1", decodeUtf8 $ B16.encode $ SHA1.hashlazy $ concat
+                        [ "blob "
+                        , fromStrict $ encodeUtf8 $ tshow $ length raw
+                        , "\0"
+                        , raw
+                        ])
                     ]
         }
     , spdCondLibrary = fmap (mapCondTree simpleLib) $ condLibrary gpd
