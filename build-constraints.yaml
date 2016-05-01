@@ -1,3 +1,10 @@
+# This file is for testing purposes only and does not affect
+# Stackage builds.  To affect Stackage builds, please
+# edit the build-constraints.yaml file in the Stackage
+# repository at
+#
+# https://github.com/fpco/stackage/blob/master/build-constraints.yaml
+
 ghc-major-version: "7.10"
 
 treat-as-non-core: []
