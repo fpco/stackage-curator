@@ -14,6 +14,11 @@ extra-source-files:  README.md
                      ChangeLog.md
                      test/test-build-constraints.yaml
 
+flag monad_unlift_0_2
+  default: True
+  manual: False
+  description: Use monad-unlift 0.2 or newer
+
 library
   default-language:    Haskell2010
   other-extensions: TemplateHaskell
@@ -73,7 +78,6 @@ library
                      , semigroups
                      , xml-conduit
                      , conduit
-                     , monad-unlift >= 0.1.1
 
                      , blaze-html
                      , html-conduit
@@ -98,6 +102,12 @@ library
                      , exceptions
                      , unordered-containers
                      , hashable
+
+  if flag(monad_unlift_0_2)
+    build-depends:     monad-unlift >= 0.2
+                     , monad-unlift-ref >= 0.2
+  else
+    build-depends:     monad-unlift >= 0.1.1 && < 0.2
 
 executable stackage-curator
   default-language:    Haskell2010
