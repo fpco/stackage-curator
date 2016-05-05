@@ -110,6 +110,7 @@ makePackageSet ps _ =
             PackagePlan
                 {ppVersion = Version v []
                 ,ppCabalFileInfo = Nothing
+                ,ppSourceUrl = Nothing
                 ,ppGithubPings = mempty
                 ,ppUsers = mempty
                 ,ppConstraints =

@@ -31,6 +31,7 @@ import           Filesystem                  (canonicalizePath, createTree,
                                               removeTree, rename, removeFile)
 import           Filesystem.Path             (parent)
 import qualified Filesystem.Path.CurrentOS   as F
+import           Network.HTTP.Simple
 import           Stackage.BuildConstraints
 import           Stackage.BuildPlan
 import           Stackage.GhcPkg
@@ -44,7 +45,7 @@ import           System.Environment          (getEnvironment)
 import           System.Exit
 import           System.IO                   (IOMode (WriteMode),
                                               openBinaryFile, hFlush)
-import           System.IO.Temp              (withSystemTempDirectory)
+import           System.IO.Temp              (withSystemTempDirectory, withSystemTempFile)
 import           System.Timeout              (timeout)
 
 data BuildException = BuildException (Map PackageName BuildFailure) [Text]
@@ -453,7 +454,9 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
                                     return $ sbBuildDir </> "cabal" </> "Cabal"
                                 else do
                                     log' $ "Unpacking " ++ namever
-                                    runParent getOutH "stack" ["unpack", namever]
+                                    case ppSourceUrl $ piPlan sbPackageInfo of
+                                        Nothing -> runParent getOutH "stack" ["unpack", namever]
+                                        Just url -> unpackFromURL sbBuildDir url
                                     return $ sbBuildDir </> unpack namever
 
                             gpd <- createSetupHs childDir name pbAllowNewer
@@ -656,6 +659,22 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
             case fromException exc of
                 Just bf -> bf
                 Nothing -> BuildFailureException exc
+
+-- | Unpack the file at the given URL into the given directory
+unpackFromURL :: MonadIO m
+              => FilePath -- ^ dest directory
+              -> Text -- ^ URL
+              -> m ()
+unpackFromURL destDir url = liftIO $ do
+    req <- parseRequest $ unpack url
+    withSystemTempFile "unpack-from-url.tar.gz" $ \fp h -> do
+      httpSink req (const $ sinkHandle h)
+      hClose h
+      let cp = (proc "tar" ["xf", fp])
+                  { cwd = Just destDir
+                  }
+      withCheckedProcessCleanup cp
+        $ \ClosedStream ClosedStream ClosedStream -> return ()
 
 -- | Maximum time (in microseconds) to run a single test suite
 maximumTestSuiteTime :: Int
