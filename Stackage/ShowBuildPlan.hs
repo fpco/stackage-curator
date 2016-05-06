@@ -32,7 +32,6 @@ import           Data.Aeson                  (object, (.=))
 import qualified Data.Aeson                  as A
 import qualified Data.ByteString             as S
 import qualified Data.ByteString.Lazy        as L
-import           Data.Foldable               (Foldable)
 import qualified Data.Foldable               as F
 import           Data.Function               (fix)
 import           Data.Map                    (Map)

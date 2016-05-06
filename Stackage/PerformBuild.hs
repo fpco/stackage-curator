@@ -38,8 +38,7 @@ import           Stackage.GhcPkg
 import           Stackage.PackageDescription
 import           Stackage.PackageIndex       (gpdFromLBS)
 import           Stackage.Prelude            hiding (pi)
-import           System.Directory            (doesDirectoryExist, doesFileExist, findExecutable,
-                                              getAppUserDataDirectory)
+import           System.Directory            (doesDirectoryExist, doesFileExist, findExecutable)
 import qualified System.FilePath             as FP
 import           System.Environment          (getEnvironment)
 import           System.Exit
@@ -628,7 +627,7 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
         let needTest = pbEnableBenches
                     && checkPrevResult prevBenchResult pcBenches
                     && not pcSkipBuild
-        when needTest $ withUnpacked $ \gpd childDir -> do
+        when needTest $ withUnpacked $ \_gpd childDir -> do
             let run = runIn childDir getOutH
                 cabal args = run "runghc" $ runghcArgs $ "Setup" : args
 

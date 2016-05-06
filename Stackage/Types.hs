@@ -31,7 +31,7 @@ module Stackage.Types
     , intersectVersionRanges
     ) where
 
-import           Control.Applicative             ((<$>), (<*>), (<|>))
+import           Control.Applicative             ((<|>))
 import           Control.Arrow                   ((&&&))
 import           Control.Exception               (Exception)
 import           Control.Monad.Catch             (MonadThrow, throwM)
@@ -43,13 +43,11 @@ import qualified Data.HashMap.Strict             as HashMap
 import           Data.Map                        (Map)
 import qualified Data.Map                        as Map
 import           Data.Maybe                      (fromMaybe)
-import           Data.Monoid                     (Monoid, mappend, mempty)
 import           Data.Semigroup                  (Semigroup, (<>))
 import           Data.Set                        (Set)
 import qualified Data.Set                        as Set
 import           Data.String                     (IsString, fromString)
 import           Data.Text                       (Text, pack, unpack)
-import qualified Data.Text                       as T
 import           Data.Time                       (Day)
 import qualified Data.Traversable                as T
 import           Data.Typeable                   (TypeRep, Typeable, typeOf)
@@ -63,7 +61,6 @@ import qualified Distribution.Version            as C
 import Safe (readMay)
 import qualified Data.Binary                           as Bin (Binary)
 import qualified Data.Binary.Tagged                    as Bin
-import qualified Data.ByteString.Base16                as B16
 import GHC.Generics (Generic)
 
 data SnapshotType = STNightly

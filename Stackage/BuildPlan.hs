@@ -22,7 +22,6 @@ import           Control.Monad.State.Strict      (execState, get, put)
 import qualified Data.Map                        as Map
 import qualified Data.Set                        as Set
 import qualified Distribution.Compiler
-import           Distribution.PackageDescription
 import           Stackage.BuildConstraints
 import           Stackage.GithubPings
 import           Stackage.PackageDescription
@@ -137,6 +136,7 @@ mkPackagePlan bc spd = do
     ppGithubPings = applyGithubMapping bc $ spdGithubPings spd
     ppConstraints = onlyRelevantFlags $ bcPackageConstraints bc name
     ppUsers = mempty -- must be filled in later
+    ppSourceUrl = Nothing
 
     -- Only include flags that are actually provided by the package. For more
     -- information, see: https://github.com/fpco/stackage-curator/issues/11
@@ -159,7 +159,7 @@ mkPackagePlan bc spd = do
 
     overrides = pcFlagOverrides ppConstraints
     flags = mapWithKey overrideFlag $ spdPackageFlags spd
-    overrideFlag name defVal = fromMaybe defVal $ lookup name overrides
+    overrideFlag name' defVal = fromMaybe defVal $ lookup name' overrides
 
 getLatestAllowedPlans :: MonadIO m => BuildConstraints -> m (Map PackageName PackagePlan)
 getLatestAllowedPlans bc =

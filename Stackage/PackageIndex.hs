@@ -10,6 +10,7 @@
 {-# LANGUAGE GADTs              #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE RecordWildCards    #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 -- | Dealing with the 00-index file and all its cabal files.
 module Stackage.PackageIndex
     ( sourcePackageIndex
@@ -25,7 +26,6 @@ import           Data.Conduit.Lazy                     (MonadActive,
                                                         lazyConsume)
 import qualified Data.Text                             as T
 import           Distribution.Compiler                 (CompilerFlavor)
-import           Distribution.ModuleName               (ModuleName)
 import           Distribution.Package                  (Dependency)
 import           Distribution.PackageDescription
 import           Distribution.PackageDescription.Parse (ParseResult (..),
@@ -33,16 +33,14 @@ import           Distribution.PackageDescription.Parse (ParseResult (..),
 import           Distribution.ParseUtils               (PError)
 import           Distribution.System                   (Arch, OS)
 import           Stackage.Prelude
-import           Stackage.Types                        (CabalFileInfo (..))
 import           Stackage.GithubPings
-import           System.Directory                      (doesFileExist, getAppUserDataDirectory, createDirectoryIfMissing)
+import           System.Directory                      (getAppUserDataDirectory, createDirectoryIfMissing)
 import           System.FilePath                       (takeDirectory)
 import qualified Data.Binary                           as Bin (Binary)
 import           Data.Binary.Orphans                   ()
 import qualified Data.Binary.Tagged                    as Bin
 import qualified Data.ByteString.Base16                as B16
 import qualified Crypto.Hash.SHA256                    as SHA256
-import           Language.Haskell.Extension            (Extension, Language, KnownExtension)
 import           Data.Proxy
 import           Crypto.Hash                 (MD5 (..), SHA1 (..), SHA256 (..),
                                               SHA512 (..), Skein512_512 (..), hashlazy,
@@ -55,10 +53,6 @@ getPackageIndexPath = liftIO $ do
     stackRoot <- getAppUserDataDirectory "stack"
     let tarball = stackRoot </> "indices" </> "Hackage" </> "00-index.tar"
     return tarball
-  where
-    getRemoteCache s = do
-        ("remote-repo-cache", stripPrefix ":" -> Just v) <- Just $ break (== ':') s
-        Just $ unpack $ T.strip v
 
 -- | A cabal file with name and version parsed from the filepath, and the
 -- package description itself ready to be parsed. It's left in unparsed form
@@ -107,12 +101,9 @@ instance Bin.Binary ConfVar
 
 -- special treatment for recursive datatype
 instance Bin.HasStructuralInfo a => Bin.HasStructuralInfo (CondTree ConfVar [Dependency] a) where
-    structuralInfo x = Bin.NominalType
+    structuralInfo _x = Bin.NominalType
         "CondTree ConfVar [Dependency]"
         -- FIXME? (Bin.structuralInfo $ getInnerProxy x)
-      where
-        getInnerProxy :: Proxy (CondTree c v a) -> Proxy a
-        getInnerProxy _ = Proxy
 
 instance Bin.HasStructuralInfo Dependency
 instance Bin.HasStructuralInfo v => Bin.HasStructuralInfo (Condition v) where
@@ -174,9 +165,9 @@ gpdToSpd raw gpd = SimplifiedPackageDescription
     simpleTest = helper noModules testBuildInfo
     simpleBench = helper noModules benchmarkBuildInfo
 
-    helper getModules getBI x = SimplifiedComponentInfo
+    helper getModules' getBI x = SimplifiedComponentInfo
         { sciBuildTools = buildTools $ getBI x
-        , sciModules = getModules x
+        , sciModules = getModules' x
         }
 
     noModules = const mempty
