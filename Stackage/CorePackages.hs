@@ -77,15 +77,26 @@ addDeepDepends name@(PackageName name') = do
 
     -- For each dependency we find: parse it to a package name and then add its
     -- dependencies.
-    dependsSink = mapM_C $ \t -> do
+    --
+    -- Also: break up multiple packages per line, and strip off the hash and
+    dependsSink = mapM_C $ \t' -> forM_ (words t') $ \t -> unless (null t) $ do
         pn <- simpleParse $ getPackageName t
         addDeepDepends pn
 
     -- Strip off the hash and version number
-    getPackageName =
-        reverse . dropSeg . dropSeg . reverse . dropWhile (== ' ')
+    getPackageName t0 =
+        reverse . dropSegs . reverse . dropWhile (== ' ') $ t0
       where
-        dropSeg = drop 1 . dropWhile (/= '-')
+        dropSegs t
+          | null y = t
+          | Just y' <- stripPrefix "-" y =
+                 if all isVersionChar x
+                     then y'
+                     else dropSegs y'
+          | otherwise = error $ "Got confused in getPackageName on: " ++ show t0
+          where
+            (x, y) = break (== '-') t
+            isVersionChar c = c == '.' || ('0' <= c && c <= '9')
 
 -- | Get a @Map@ of all of the core packages. Core packages are defined as
 -- packages which ship with GHC itself.
