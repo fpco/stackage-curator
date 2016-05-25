@@ -1,6 +1,7 @@
 ## 0.14.1
 
 * configure-args
+* Support for GHC 8's documentation directory location
 
 ## 0.14.0
 

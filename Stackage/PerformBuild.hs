@@ -38,7 +38,7 @@ import           Stackage.GhcPkg
 import           Stackage.PackageDescription
 import           Stackage.PackageIndex       (gpdFromLBS)
 import           Stackage.Prelude            hiding (pi)
-import           System.Directory            (doesDirectoryExist, doesFileExist, findExecutable)
+import           System.Directory            (doesDirectoryExist, doesFileExist, findExecutable, getDirectoryContents)
 import qualified System.FilePath             as FP
 import           System.Environment          (getEnvironment)
 import           System.Exit
@@ -692,8 +692,26 @@ copyBuiltInHaddocks docdir = do
     case mghc of
         Nothing -> error "GHC not found on PATH"
         Just ghc -> do
-            src <- canonicalizePath $ fromString
-                (F.encodeString (parent (fromString ghc)) </> "../share/doc/ghc/html/libraries")
+            -- Starting with GHC 8, the doc/ghc directory is now
+            -- doc/ghc-8.0.1 (and so on). Let's put in a hacky trick
+            -- to find the right directory.
+
+            let root = F.encodeString (parent (fromString ghc)) </>
+                            "../share/doc"
+            names <- getDirectoryContents root
+            let hidden ('.':_) = True
+                hidden _ = False
+            name <-
+                case filter (not . hidden) names of
+                    [x] -> return x
+                    _ -> error $ concat
+                      [ "Unexpected list of contents in "
+                      , root
+                      , ": "
+                      , show names
+                      ]
+            src <- canonicalizePath $ fromString $
+                root </> name </> "html/libraries"
             copyDir (F.encodeString src) docdir
 
 ------------- Previous results
