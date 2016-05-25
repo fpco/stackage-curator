@@ -116,6 +116,7 @@ makePackageSet ps _ =
                 ,ppConstraints =
                     PackageConstraints
                         {pcVersionRange = anyV
+                        ,pcConfigureArgs = mempty
                         ,pcMaintainer = Nothing
                         ,pcTests = Don'tBuild
                         ,pcHaddocks = Don'tBuild

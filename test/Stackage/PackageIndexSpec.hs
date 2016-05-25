@@ -4,7 +4,6 @@ module Stackage.PackageIndexSpec (spec) where
 import Stackage.PackageIndex
 import Stackage.Prelude
 import Test.Hspec
-import Distribution.Package (packageId)
 import System.Directory (doesFileExist, getAppUserDataDirectory)
 
 spec :: Spec
