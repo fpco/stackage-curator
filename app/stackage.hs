@@ -7,7 +7,6 @@ import qualified Data.Text                    as T
 import           Data.Text.Read               (decimal)
 import           Options.Applicative
 import           Paths_stackage_curator       (version)
-import qualified Prelude
 import           Stackage.CLI
 import           Stackage.CompleteBuild
 import           Stackage.Curator.UploadIndex

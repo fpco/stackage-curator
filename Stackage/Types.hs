@@ -247,6 +247,7 @@ data PackageConstraints = PackageConstraints
     , pcBenches          :: TestState
     , pcHaddocks         :: TestState
     , pcFlagOverrides    :: Map FlagName Bool
+    , pcConfigureArgs    :: Vector Text
     , pcEnableLibProfile :: Bool
     , pcSkipBuild        :: Bool
     -- ^ Don't even bother building this library, useful when dealing with
@@ -270,6 +271,7 @@ instance ToJSON PackageConstraints where
         , "flags" .= Map.mapKeysWith const unFlagName pcFlagOverrides
         , "library-profiling" .= pcEnableLibProfile
         , "skip-build" .= pcSkipBuild
+        , "configure-args" .= pcConfigureArgs
         ]
       where
         addMaintainer = maybe id (\m -> (("maintainer" .= m):)) pcMaintainer
@@ -287,6 +289,7 @@ instance FromJSON PackageConstraints where
         pcMaintainer <- o .:? "maintainer"
         pcEnableLibProfile <- fmap (fromMaybe True) (o .:? "library-profiling")
         pcSkipBuild <- o .:? "skip-build" .!= False
+        pcConfigureArgs <- o .:? "configure-args" .!= mempty
         return PackageConstraints {..}
 
 data TestState = ExpectSuccess

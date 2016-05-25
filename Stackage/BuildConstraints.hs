@@ -108,6 +108,7 @@ getSystemInfo = do
 
 data ConstraintFile = ConstraintFile
     { cfPackageFlags            :: Map PackageName (Map FlagName Bool)
+    , cfConfigureArgs           :: Map PackageName (Vector Text)
     , cfSkippedTests            :: Set PackageName
     , cfSkippedBuilds           :: Set PackageName
     , cfExpectedTestFailures    :: Set PackageName
@@ -125,6 +126,7 @@ data ConstraintFile = ConstraintFile
 instance FromJSON ConstraintFile where
     parseJSON = withObject "ConstraintFile" $ \o -> do
         cfPackageFlags <- (goPackageMap . fmap goFlagMap) <$> o .: "package-flags"
+        cfConfigureArgs <- goPackageMap <$> o .:? "configure-args" .!= mempty
         cfSkippedTests <- getPackages o "skipped-tests"
         cfSkippedBuilds <- getPackages o "skipped-builds" <|> return mempty
         cfExpectedTestFailures <- getPackages o "expected-test-failures"
@@ -208,6 +210,7 @@ toBC ConstraintFile {..} = do
 
             | otherwise = ExpectSuccess
         pcFlagOverrides = fromMaybe mempty $ lookup name cfPackageFlags
+        pcConfigureArgs = fromMaybe mempty $ lookup name cfConfigureArgs
         pcSkipBuild = name `member` cfSkippedBuilds
 
     bcGithubUsers = cfGithubUsers

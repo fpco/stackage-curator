@@ -30,6 +30,7 @@ updateBuildConstraints BuildPlan {..} =
 
     bcPackageConstraints name = PackageConstraints
         { pcVersionRange = addBumpRange (maybe anyVersion pcVersionRange moldPC)
+        , pcConfigureArgs = maybe mempty pcConfigureArgs moldPC
         , pcMaintainer = moldPC >>= pcMaintainer
         , pcTests = maybe ExpectSuccess pcTests moldPC
         , pcHaddocks = maybe ExpectSuccess pcHaddocks moldPC

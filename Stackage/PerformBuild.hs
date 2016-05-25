@@ -420,6 +420,8 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
         when (pbEnableLibProfiling && pcEnableLibProfile) $
             tell' "--enable-library-profiling"
         when pbEnableExecDyn $ tell' "--enable-executable-dynamic"
+
+        tell (toList pcConfigureArgs ++)
       where
         tell' x = tell (x:)
 

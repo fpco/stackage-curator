@@ -1,3 +1,7 @@
+## 0.14.1
+
+* configure-args
+
 ## 0.14.0
 
 * Move stackage-types into this package
