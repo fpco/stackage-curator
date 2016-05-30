@@ -43,7 +43,7 @@ import qualified Data.HashMap.Strict             as HashMap
 import           Data.Map                        (Map)
 import qualified Data.Map                        as Map
 import           Data.Maybe                      (fromMaybe)
-import           Data.Semigroup                  (Semigroup, (<>))
+import           Data.Semigroup                  (Semigroup, (<>), Option (..), Max (..))
 import           Data.Set                        (Set)
 import qualified Data.Set                        as Set
 import           Data.String                     (IsString, fromString)
@@ -371,25 +371,30 @@ data SimpleDesc = SimpleDesc
     , sdProvidedExes :: Set ExeName
     , sdModules      :: Set Text
     -- ^ modules exported by the library
-    , sdCabalVersion :: VersionRange
+    , sdCabalVersion :: Option (Max Version)
+    -- ^ minimum acceptable Cabal version
     }
     deriving (Show, Eq)
 instance Monoid SimpleDesc where
-    mempty = SimpleDesc mempty mempty mempty mempty C.anyVersion
+    mempty = SimpleDesc mempty mempty mempty mempty mempty
     mappend (SimpleDesc a b c d e) (SimpleDesc w x y z e') = SimpleDesc
         (Map.unionWith (<>) a w)
         (Map.unionWith (<>) b x)
         (c <> y)
         (d <> z)
-        (intersectVersionRanges e e')
+        (e <> e')
 instance ToJSON SimpleDesc where
-    toJSON SimpleDesc {..} = object
+    toJSON SimpleDesc {..} = object $ addCabalVersion
         [ "packages" .= Map.mapKeysWith const unPackageName sdPackages
         , "tools" .= Map.mapKeysWith const unExeName sdTools
         , "provided-exes" .= sdProvidedExes
         , "modules" .= sdModules
-        , "cabal-version" .= display sdCabalVersion
         ]
+      where
+        addCabalVersion rest =
+          case sdCabalVersion of
+              Option (Just (Max v)) -> ("cabal-version" .= display v) : rest
+              Option Nothing -> rest
 instance FromJSON SimpleDesc where
     parseJSON = withObject "SimpleDesc" $ \o -> do
         sdPackages <- Map.mapKeysWith const mkPackageName <$> (o .: "packages")
@@ -397,8 +402,8 @@ instance FromJSON SimpleDesc where
         sdProvidedExes <- o .: "provided-exes"
         sdModules <- o .: "modules"
         sdCabalVersion <- o .:? "cabal-version" >>= maybe
-                            (return C.anyVersion)
-                            (either (fail . show) return . simpleParse)
+                            (return $ Option Nothing)
+                            (either (fail . show) (return . Option . Just . Max) . simpleParse)
         return SimpleDesc {..}
 
 data DepInfo = DepInfo

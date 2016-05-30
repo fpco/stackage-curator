@@ -14,6 +14,7 @@ module Stackage.CheckBuildPlan
 
 import           Control.Monad.Writer.Strict (Writer, execWriter, tell)
 import qualified Data.Map.Strict as M
+import           Data.Semigroup (Option (..), Max (..))
 import qualified Data.Text as T
 import           Stackage.BuildConstraints
 import           Stackage.BuildPlan
@@ -93,16 +94,16 @@ checkDeps getMaint allPackages (user, pb) =
 -- | Ensure our selected Cabal version is sufficient for the given
 -- package
 checkCabalVersion :: Version -> (PackageName, PackagePlan) -> Writer BadBuildPlan ()
-checkCabalVersion cabalVersion (name, plan) =
-    unless (cabalVersion `withinRange` range) $ tell $ BadBuildPlan
+checkCabalVersion cabalVersion (name, plan)
+  | Option (Just (Max neededVersion)) <- sdCabalVersion (ppDesc plan) =
+    unless (cabalVersion >= neededVersion) $ tell $ BadBuildPlan
            mempty $ singletonMap name $ singleton $ concat
                   [ "Cabal version "
                   , display cabalVersion
-                  , " not in expected range "
-                  , display range
+                  , " sufficient for "
+                  , display neededVersion
                   ]
-  where
-    range = sdCabalVersion $ ppDesc plan
+  | otherwise = return ()
 
 -- | Check whether the package(s) occurs within its own dependency
 -- tree.

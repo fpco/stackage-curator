@@ -6,11 +6,10 @@
 {-# LANGUAGE NoImplicitPrelude  #-}
 {-# LANGUAGE OverloadedStrings  #-}
 {-# LANGUAGE RankNTypes         #-}
-{-# LANGUAGE ViewPatterns       #-}
 {-# LANGUAGE GADTs              #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE RecordWildCards    #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# OPTIONS_GHC -fno-warn-orphans -fno-warn-deprecations #-}
 -- | Dealing with the 00-index file and all its cabal files.
 module Stackage.PackageIndex
     ( sourcePackageIndex
@@ -26,6 +25,7 @@ import           Data.Conduit.Lazy                     (MonadActive,
                                                         lazyConsume)
 import qualified Data.Text                             as T
 import           Distribution.Compiler                 (CompilerFlavor)
+import           Distribution.Version                  (VersionRange (..))
 import           Distribution.Package                  (Dependency)
 import           Distribution.PackageDescription
 import           Distribution.PackageDescription.Parse (ParseResult (..),
@@ -84,7 +84,7 @@ data SimplifiedPackageDescription = SimplifiedPackageDescription
     , spdCondBenchmarks :: [(String, CondTree ConfVar [Dependency] SimplifiedComponentInfo)]
     , spdPackageFlags :: Map FlagName Bool
     , spdGithubPings :: Set Text
-    , spdCabalVersion :: Either Version VersionRange
+    , spdCabalVersion :: Maybe Version
     }
     deriving Generic
 instance Bin.Binary SimplifiedPackageDescription
@@ -157,7 +157,27 @@ gpdToSpd raw gpd = SimplifiedPackageDescription
         let getFlag MkFlag {..} = (flagName, flagDefault)
          in mapFromList $ map getFlag $ genPackageFlags gpd
     , spdGithubPings = getGithubPings gpd
-    , spdCabalVersion = specVersionRaw $ packageDescription gpd
+    , spdCabalVersion =
+        case specVersionRaw $ packageDescription gpd of
+          Left v -> Just v
+          Right range0 ->
+              let maxRange AnyVersion = Nothing
+                  maxRange (ThisVersion v) = Just v
+                  maxRange (LaterVersion v) = Just v
+                  -- ideally the following case would never happen
+                  maxRange (EarlierVersion v) = Just v
+                  maxRange (WildcardVersion v) = Just v
+                  maxRange (UnionVersionRanges x y) = maxRanges x y
+                  maxRange (IntersectVersionRanges x y) = maxRanges x y
+                  maxRange (VersionRangeParens x) = maxRange x
+
+                  maxRanges x y =
+                      case (maxRange x, maxRange y) of
+                          (Nothing, Nothing) -> Nothing
+                          (Just x', Nothing) -> Just x'
+                          (Nothing, Just y') -> Just y'
+                          (Just x', Just y') -> Just (max x' y')
+               in maxRange range0
     }
   where
     PackageIdentifier name version = package $ packageDescription gpd

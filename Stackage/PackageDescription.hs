@@ -19,11 +19,11 @@ module Stackage.PackageDescription
 
 import           Control.Monad.Writer.Strict     (MonadWriter, execWriterT,
                                                   tell)
+import           Data.Semigroup                  (Option (..), Max (..))
 import           Distribution.Compiler           (CompilerFlavor)
 import           Distribution.Package            (Dependency (..))
 import           Distribution.PackageDescription
 import           Distribution.System             (Arch, OS)
-import           Distribution.Version            (orLaterVersion)
 import           Stackage.PackageIndex
 import           Stackage.Prelude
 
@@ -39,7 +39,7 @@ toSimpleDesc cc spd = execWriterT $ do
     tell mempty { sdProvidedExes = setFromList
                                  $ map (fromString . fst)
                                  $ spdCondExecutables spd
-                , sdCabalVersion = either orLaterVersion id (spdCabalVersion spd)
+                , sdCabalVersion = Option $ Max <$> spdCabalVersion spd
                 }
     when (ccIncludeTests cc) $ forM_ (spdCondTestSuites spd)
         $ tellTree cc CompTestSuite . snd
