@@ -21,15 +21,28 @@ import           Stackage.PackageDescription
 import           Stackage.Prelude
 
 -- | Check the build plan for missing deps, wrong versions, etc.
-checkBuildPlan :: (MonadThrow m) => BuildPlan -> m ()
-checkBuildPlan BuildPlan {..}
-    | null errs' = return ()
+checkBuildPlan :: (MonadThrow m)
+               => Bool -- ^ fail on missing Cabal package
+               -> BuildPlan
+               -> m ()
+checkBuildPlan failMissingCabal BuildPlan {..}
+    | null errs1 && null errs2 = return ()
     | otherwise = throwM errs
   where
     allPackages = map (,mempty) (siCorePackages bpSystemInfo) ++
                   map (ppVersion &&& M.keys . M.filter libAndExe . sdPackages . ppDesc) bpPackages
-    errs@(BadBuildPlan errs') =
-        execWriter $ mapM_ (checkDeps getMaint allPackages) $ mapToList bpPackages
+    errs@(BadBuildPlan errs1 errs2) = execWriter $ do
+        mapM_ (checkDeps getMaint allPackages) $ mapToList bpPackages
+        let cabalName = PackageName "Cabal"
+        case lookup cabalName bpPackages of
+            Nothing
+                | failMissingCabal -> tell
+                    $ BadBuildPlan mempty
+                    $ singletonMap cabalName
+                    $ singleton "Cabal not found in build plan"
+                | otherwise -> return ()
+            Just (ppVersion -> cabalVersion) ->
+                mapM_ (checkCabalVersion cabalVersion) (mapToList bpPackages)
     -- Only looking at libraries and executables, benchmarks and tests
     -- are allowed to create cycles (e.g. test-framework depends on
     -- text, which uses test-framework in its test-suite).
@@ -54,20 +67,20 @@ checkDeps getMaint allPackages (user, pb) =
   where
     go (dep, diRange -> range) =
         case lookup dep allPackages of
-            Nothing -> tell $ BadBuildPlan $ singletonMap (dep, getMaint dep, Nothing) errMap
+            Nothing -> tell $ BadBuildPlan (singletonMap (dep, getMaint dep, Nothing) errMap) mempty
             Just (version,deps)
                 | version `withinRange` range ->
                     occursCheck allPackages
                                 (\d v ->
-                                     tell $ BadBuildPlan $ singletonMap
+                                     tell $ BadBuildPlan (singletonMap
                                      (d, getMaint dep, v)
-                                     errMap)
+                                     errMap) mempty)
                                 dep
                                 deps
                                 []
-                | otherwise -> tell $ BadBuildPlan $ singletonMap
+                | otherwise -> tell $ BadBuildPlan (singletonMap
                     (dep, getMaint dep, Just version)
-                    errMap
+                    errMap) mempty
       where
         errMap = singletonMap pu range
         pu = PkgUser
@@ -76,6 +89,20 @@ checkDeps getMaint allPackages (user, pb) =
             , puMaintainer = pcMaintainer $ ppConstraints pb
             , puGithubPings = ppGithubPings pb
             }
+
+-- | Ensure our selected Cabal version is sufficient for the given
+-- package
+checkCabalVersion :: Version -> (PackageName, PackagePlan) -> Writer BadBuildPlan ()
+checkCabalVersion cabalVersion (name, plan) =
+    unless (cabalVersion `withinRange` range) $ tell $ BadBuildPlan
+           mempty $ singletonMap name $ singleton $ concat
+                  [ "Cabal version "
+                  , display cabalVersion
+                  , " not in expected range "
+                  , display range
+                  ]
+  where
+    range = sdCabalVersion $ ppDesc plan
 
 -- | Check whether the package(s) occurs within its own dependency
 -- tree.
@@ -129,15 +156,16 @@ pkgUserShow2 PkgUser {..} = unwords
     $ (maybe "No maintainer" unMaintainer puMaintainer ++ ".")
     : map (cons '@') (setToList puGithubPings)
 
-newtype BadBuildPlan =
-    BadBuildPlan (Map (PackageName, Maybe Maintainer, Maybe Version) (Map PkgUser VersionRange))
+data BadBuildPlan = BadBuildPlan
+     (Map (PackageName, Maybe Maintainer, Maybe Version) (Map PkgUser VersionRange))
+     (Map PackageName (Vector Text))
     deriving Typeable
 instance Exception BadBuildPlan
 instance Show BadBuildPlan where
-    show (BadBuildPlan errs) =
-        unpack $ concatMap go $ mapToList errs
+    show (BadBuildPlan errs1 errs2) =
+        unpack $ concatMap go1 (mapToList errs1) ++ concatMap go2 (mapToList errs2)
       where
-        go ((dep, mmaint, mdepVer), users) = unlines
+        go1 ((dep, mmaint, mdepVer), users) = unlines
             $ ""
             : showDepVer dep mmaint mdepVer
             : map showUser (mapToList users)
@@ -178,7 +206,13 @@ instance Show BadBuildPlan where
             , pkgUserShow2 pu
             ]
 
+        go2 :: (PackageName, Vector Text) -> Text
+        go2 (name, errs) = unlines
+          $ display name
+          : map (\err -> "    " ++ err) (toList errs)
+
 instance Monoid BadBuildPlan where
-    mempty = BadBuildPlan mempty
-    mappend (BadBuildPlan x) (BadBuildPlan y) =
-        BadBuildPlan $ unionWith (unionWith intersectVersionRanges) x y
+    mempty = BadBuildPlan mempty mempty
+    mappend (BadBuildPlan a x) (BadBuildPlan b y) = BadBuildPlan
+        (unionWith (unionWith intersectVersionRanges) a b)
+        (unionWith mappend x y)

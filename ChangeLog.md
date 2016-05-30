@@ -2,6 +2,7 @@
 
 * configure-args
 * Support for GHC 8's documentation directory location
+* Checked cabal-version in .cabal files
 
 ## 0.14.0
 

@@ -84,7 +84,7 @@ installBuild installFlags@InstallFlags{..} = do
         then putStrLn "Skipping build plan check"
         else do
             putStrLn "Checking build plan"
-            checkBuildPlan plan
+            checkBuildPlan True plan
 
     putStrLn "Performing build"
     performBuild (getPerformBuild plan installFlags) >>= mapM_ putStrLn

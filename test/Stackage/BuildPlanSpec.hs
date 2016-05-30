@@ -76,7 +76,7 @@ check readPlanFile getPlans = do
     when (bp' /= bp) $ error "bp' /= bp"
     bp2 <- updateBuildPlan plans bp
     when (dropVersionRanges bp2 /= dropVersionRanges bp) $ error "bp2 /= bp"
-    checkBuildPlan bp
+    checkBuildPlan False bp
   where
     dropVersionRanges bp =
         bp { bpPackages = map go $ bpPackages bp }
@@ -129,7 +129,8 @@ makePackageSet ps _ =
                         {sdPackages = deps
                         ,sdTools = mempty
                         ,sdProvidedExes = mempty
-                        ,sdModules = mempty}}
+                        ,sdModules = mempty
+                        ,sdCabalVersion = anyVersion}}
 
 -- | This exact version is required.
 thisV :: [Int] -> VersionRange

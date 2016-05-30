@@ -149,7 +149,7 @@ checkPlan mfp = stillAlive $ do
 
                 plan <- planFromConstraints bc
 
-                putStrLn $ "Writing build plan to check-plan.yaml"
+                putStrLn "Writing build plan to check-plan.yaml"
                 encodeFile "check-plan.yaml" plan
 
                 return plan
@@ -158,7 +158,7 @@ checkPlan mfp = stillAlive $ do
                 decodeFileEither fp >>= either throwM return
 
     putStrLn "Checking plan"
-    checkBuildPlan plan
+    checkBuildPlan True plan
 
     putStrLn "Plan seems valid!"
 

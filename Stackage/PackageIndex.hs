@@ -84,6 +84,7 @@ data SimplifiedPackageDescription = SimplifiedPackageDescription
     , spdCondBenchmarks :: [(String, CondTree ConfVar [Dependency] SimplifiedComponentInfo)]
     , spdPackageFlags :: Map FlagName Bool
     , spdGithubPings :: Set Text
+    , spdCabalVersion :: Either Version VersionRange
     }
     deriving Generic
 instance Bin.Binary SimplifiedPackageDescription
@@ -148,7 +149,7 @@ gpdToSpd raw gpd = SimplifiedPackageDescription
                         ])
                     ]
         }
-    , spdCondLibrary = fmap (mapCondTree simpleLib) $ condLibrary gpd
+    , spdCondLibrary = mapCondTree simpleLib <$> condLibrary gpd
     , spdCondExecutables = map (fmap $ mapCondTree simpleExe) $ condExecutables gpd
     , spdCondTestSuites = map (fmap $ mapCondTree simpleTest) $ condTestSuites gpd
     , spdCondBenchmarks = map (fmap $ mapCondTree simpleBench) $ condBenchmarks gpd
@@ -156,6 +157,7 @@ gpdToSpd raw gpd = SimplifiedPackageDescription
         let getFlag MkFlag {..} = (flagName, flagDefault)
          in mapFromList $ map getFlag $ genPackageFlags gpd
     , spdGithubPings = getGithubPings gpd
+    , spdCabalVersion = specVersionRaw $ packageDescription gpd
     }
   where
     PackageIdentifier name version = package $ packageDescription gpd
