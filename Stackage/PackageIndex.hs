@@ -82,6 +82,7 @@ data SimplifiedPackageDescription = SimplifiedPackageDescription
     , spdCondExecutables :: [(String, CondTree ConfVar [Dependency] SimplifiedComponentInfo)]
     , spdCondTestSuites :: [(String, CondTree ConfVar [Dependency] SimplifiedComponentInfo)]
     , spdCondBenchmarks :: [(String, CondTree ConfVar [Dependency] SimplifiedComponentInfo)]
+    , spdSetupDeps :: [Dependency]
     , spdPackageFlags :: Map FlagName Bool
     , spdGithubPings :: Set Text
     , spdCabalVersion :: Maybe Version
@@ -90,15 +91,6 @@ data SimplifiedPackageDescription = SimplifiedPackageDescription
 instance Bin.Binary SimplifiedPackageDescription
 instance Bin.HasStructuralInfo SimplifiedPackageDescription
 instance Bin.HasSemanticVersion SimplifiedPackageDescription
-
--- BEGIN orphans
-deriving instance Generic (CondTree v c a)
-deriving instance Generic (Condition c)
-deriving instance Generic ConfVar
-
-instance (Bin.Binary v, Bin.Binary c, Bin.Binary a) => Bin.Binary (CondTree v c a)
-instance Bin.Binary c => Bin.Binary (Condition c)
-instance Bin.Binary ConfVar
 
 -- special treatment for recursive datatype
 instance Bin.HasStructuralInfo a => Bin.HasStructuralInfo (CondTree ConfVar [Dependency] a) where
@@ -119,7 +111,13 @@ instance Bin.HasStructuralInfo Arch
 instance Bin.HasStructuralInfo OS
 instance Bin.HasStructuralInfo CompilerFlavor
 instance Bin.HasStructuralInfo PackageName
-instance Bin.HasStructuralInfo VersionRange
+instance Bin.HasStructuralInfo VersionRange where
+    structuralInfo x = Bin.NominalNewtype
+        "VersionRange"
+        (Bin.structuralInfo $ getInnerProxy x)
+      where
+        getInnerProxy :: Proxy VersionRange -> Proxy ()
+        getInnerProxy _ = Proxy
 instance Bin.HasStructuralInfo FlagName
 -- END orphans
 
@@ -153,6 +151,7 @@ gpdToSpd raw gpd = SimplifiedPackageDescription
     , spdCondExecutables = map (fmap $ mapCondTree simpleExe) $ condExecutables gpd
     , spdCondTestSuites = map (fmap $ mapCondTree simpleTest) $ condTestSuites gpd
     , spdCondBenchmarks = map (fmap $ mapCondTree simpleBench) $ condBenchmarks gpd
+    , spdSetupDeps = maybe [] setupDepends $ setupBuildInfo $ packageDescription gpd
     , spdPackageFlags =
         let getFlag MkFlag {..} = (flagName, flagDefault)
          in mapFromList $ map getFlag $ genPackageFlags gpd

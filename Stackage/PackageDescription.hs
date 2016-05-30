@@ -40,6 +40,11 @@ toSimpleDesc cc spd = execWriterT $ do
                                  $ map (fromString . fst)
                                  $ spdCondExecutables spd
                 , sdCabalVersion = Option $ Max <$> spdCabalVersion spd
+                , sdPackages = unionsWith (<>) $ flip map (spdSetupDeps spd)
+                   $ \(Dependency x y) -> singletonMap x DepInfo
+                        { diComponents = setFromList [minBound..maxBound]
+                        , diRange = simplifyVersionRange y
+                        }
                 }
     when (ccIncludeTests cc) $ forM_ (spdCondTestSuites spd)
         $ tellTree cc CompTestSuite . snd
