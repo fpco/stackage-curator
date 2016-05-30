@@ -100,7 +100,7 @@ checkCabalVersion cabalVersion (name, plan)
            mempty $ singletonMap name $ singleton $ concat
                   [ "Cabal version "
                   , display cabalVersion
-                  , " sufficient for "
+                  , " not sufficient for "
                   , display neededVersion
                   ]
   | otherwise = return ()
