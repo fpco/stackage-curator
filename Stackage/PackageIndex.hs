@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds          #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveFunctor      #-}
 {-# LANGUAGE DeriveGeneric      #-}
@@ -9,6 +10,7 @@
 {-# LANGUAGE GADTs              #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE RecordWildCards    #-}
+{-# LANGUAGE TemplateHaskell    #-}
 {-# OPTIONS_GHC -fno-warn-orphans -fno-warn-deprecations #-}
 -- | Dealing with the 00-index file and all its cabal files.
 module Stackage.PackageIndex
@@ -36,16 +38,15 @@ import           Stackage.Prelude
 import           Stackage.GithubPings
 import           System.Directory                      (getAppUserDataDirectory, createDirectoryIfMissing)
 import           System.FilePath                       (takeDirectory)
-import qualified Data.Binary                           as Bin (Binary)
-import           Data.Binary.Orphans                   ()
-import qualified Data.Binary.Tagged                    as Bin
 import qualified Data.ByteString.Base16                as B16
 import qualified Crypto.Hash.SHA256                    as SHA256
-import           Data.Proxy
 import           Crypto.Hash                 (MD5 (..), SHA1 (..), SHA256 (..),
                                               SHA512 (..), Skein512_512 (..), hashlazy,
                                               Digest, HashAlgorithm, digestToHexByteString)
 import qualified Crypto.Hash.SHA1 as SHA1
+import           Data.Store                            (Store)
+import qualified Data.Store                            as Store
+import qualified Data.Store.TypeHash                   as Store
 
 -- | Name of the 00-index.tar downloaded from Hackage.
 getPackageIndexPath :: MonadIO m => m FilePath
@@ -70,9 +71,7 @@ data SimplifiedComponentInfo = SimplifiedComponentInfo
     , sciModules :: Set Text
     }
     deriving Generic
-instance Bin.Binary SimplifiedComponentInfo
-instance Bin.HasStructuralInfo SimplifiedComponentInfo
-instance Bin.HasSemanticVersion SimplifiedComponentInfo
+instance Store SimplifiedComponentInfo
 
 data SimplifiedPackageDescription = SimplifiedPackageDescription
     { spdName :: PackageName
@@ -88,38 +87,26 @@ data SimplifiedPackageDescription = SimplifiedPackageDescription
     , spdCabalVersion :: Maybe Version
     }
     deriving Generic
-instance Bin.Binary SimplifiedPackageDescription
-instance Bin.HasStructuralInfo SimplifiedPackageDescription
-instance Bin.HasSemanticVersion SimplifiedPackageDescription
 
--- special treatment for recursive datatype
-instance Bin.HasStructuralInfo a => Bin.HasStructuralInfo (CondTree ConfVar [Dependency] a) where
-    structuralInfo _x = Bin.NominalType
-        "CondTree ConfVar [Dependency]"
-        -- FIXME? (Bin.structuralInfo $ getInnerProxy x)
+deriving instance Generic Version
 
-instance Bin.HasStructuralInfo Dependency
-instance Bin.HasStructuralInfo v => Bin.HasStructuralInfo (Condition v) where
-    structuralInfo x = Bin.NominalNewtype
-        "Condition"
-        (Bin.structuralInfo $ getInnerProxy x)
-      where
-        getInnerProxy :: Proxy (Condition v) -> Proxy v
-        getInnerProxy _ = Proxy
-instance Bin.HasStructuralInfo ConfVar
-instance Bin.HasStructuralInfo Arch
-instance Bin.HasStructuralInfo OS
-instance Bin.HasStructuralInfo CompilerFlavor
-instance Bin.HasStructuralInfo PackageName
-instance Bin.HasStructuralInfo VersionRange where
-    structuralInfo x = Bin.NominalNewtype
-        "VersionRange"
-        (Bin.structuralInfo $ getInnerProxy x)
-      where
-        getInnerProxy :: Proxy VersionRange -> Proxy ()
-        getInnerProxy _ = Proxy
-instance Bin.HasStructuralInfo FlagName
+instance Store SimplifiedPackageDescription
+instance Store a => Store (CondTree ConfVar [Dependency] a)
+instance Store Dependency
+instance Store v => Store (Condition v)
+instance Store ConfVar
+instance Store Arch
+instance Store OS
+instance Store CompilerFlavor
+instance Store PackageName
+instance Store Version
+instance Store VersionRange
+instance Store FlagName
 -- END orphans
+
+Store.mkManyHasTypeHash
+    [ [t|SimplifiedPackageDescription|]
+    ]
 
 gpdToSpd :: LByteString -- ^ raw cabal file contents
          -> GenericPackageDescription -> SimplifiedPackageDescription
@@ -204,13 +191,13 @@ ucfParse :: MonadIO m
          -> UnparsedCabalFile
          -> m SimplifiedPackageDescription
 ucfParse root (UnparsedCabalFile name version fp lbs _entry) = liftIO $ do
-    eres <- tryIO $ Bin.taggedDecodeFileOrFail cache
+    eres <- tryIO $ fmap Store.decode $ readFile cache
     case eres of
-        Right (Right x) -> return x
+        Right (Right (Store.Tagged x)) -> return x
         _ -> do
             x <- parseFromText
             createDirectoryIfMissing True $ takeDirectory cache
-            Bin.taggedEncodeFile cache x
+            writeFile cache $ Store.encode $ Store.Tagged x
             return x
   where
     -- location of the binary cache

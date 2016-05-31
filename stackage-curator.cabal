@@ -93,9 +93,7 @@ library
                      , resourcet
                      , stackage-install >= 0.1.1
                      , lucid
-                     , binary
-                     , binary-tagged
-                     , binary-orphans
+                     , store
                      , syb
                      , safe
                      , vector

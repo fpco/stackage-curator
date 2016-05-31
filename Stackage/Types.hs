@@ -59,9 +59,8 @@ import qualified Distribution.Text               as DT
 import           Distribution.Version            (Version, VersionRange)
 import qualified Distribution.Version            as C
 import Safe (readMay)
-import qualified Data.Binary                           as Bin (Binary)
-import qualified Data.Binary.Tagged                    as Bin
 import GHC.Generics (Generic)
+import Data.Store (Store)
 
 data SnapshotType = STNightly
                   | STNightly2 !Day
@@ -196,9 +195,7 @@ data CabalFileInfo = CabalFileInfo
     -- ^ Various hashes of the file contents
     }
     deriving (Show, Eq, Generic)
-instance Bin.Binary CabalFileInfo
-instance Bin.HasStructuralInfo CabalFileInfo
-instance Bin.HasSemanticVersion CabalFileInfo
+instance Store CabalFileInfo
 instance ToJSON CabalFileInfo where
     toJSON CabalFileInfo {..} = object
         [ "size" .= cfiSize
