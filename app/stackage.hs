@@ -6,8 +6,8 @@ import           Control.Monad
 import qualified Data.Text                    as T
 import           Data.Text.Read               (decimal)
 import           Options.Applicative
+import           Options.Applicative.Simple   (simpleOptions, simpleVersion, addCommand)
 import           Paths_stackage_curator       (version)
-import           Stackage.CLI
 import           Stackage.CompleteBuild
 import           Stackage.Curator.UploadIndex
 import           Stackage.DiffPlans

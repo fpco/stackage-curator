@@ -7,9 +7,9 @@ import qualified Data.Text.Lazy            as TL
 import           Data.Text.Lazy.Builder    (toLazyText)
 import qualified Data.Text.Lazy.IO         as TLIO
 import           Options.Applicative
+import           Options.Applicative.Simple (simpleOptions, simpleVersion)
 import           Paths_stackage_curator    (version)
 import           Stackage.ShowBuildPlan
-import           Stackage.CLI              (simpleOptions, simpleVersion)
 
 main :: IO ()
 main = do
