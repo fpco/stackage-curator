@@ -88,13 +88,16 @@ unregisterPackage log' onUnregister docDir flags ident@(PackageIdentifier name _
         (CT.decodeUtf8
          $= CT.lines
          $= CL.mapMaybe parseLibraryDir
-         $= CL.mapM_ (void . tryIO . removeTree . FP.decodeString))
+         $= CL.mapM_ (void . tryIO' . removeTree . FP.decodeString))
 
     void (readProcessWithExitCode
               "ghc-pkg"
               ("unregister": flags ++ ["--force", unpack $ display name])
               "")
 
-    void $ tryIO $ removeTree $ FP.decodeString $ docDir </> unpack (display ident)
+    void $ tryIO' $ removeTree $ FP.decodeString $ docDir </> unpack (display ident)
   where
     parseLibraryDir = fmap unpack . stripPrefix "library-dirs: "
+
+    tryIO' :: IO a -> IO (Either IOException a)
+    tryIO' = try

@@ -194,7 +194,7 @@ ucfParse :: MonadIO m
          -> UnparsedCabalFile
          -> m SimplifiedPackageDescription
 ucfParse root (UnparsedCabalFile name version fp lbs _entry) = liftIO $ do
-    eres <- tryIO $ fmap Store.decode $ readFile cache
+    eres <- tryIO' $ fmap Store.decode $ readFile cache
     case eres of
         Right (Right (Store.Tagged x)) -> return x
         _ -> do
@@ -203,6 +203,9 @@ ucfParse root (UnparsedCabalFile name version fp lbs _entry) = liftIO $ do
             writeFile cache $ Store.encode $ Store.Tagged x
             return x
   where
+    tryIO' :: IO a -> IO (Either IOException a)
+    tryIO' = try
+
     -- location of the binary cache
     cache = root </> "cache" </> (unpack $ decodeUtf8 $ B16.encode $ SHA256.hashlazy lbs)
 

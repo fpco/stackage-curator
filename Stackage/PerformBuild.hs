@@ -219,7 +219,7 @@ performBuild' pb@PerformBuild {..} = withBuildDir $ \builddir -> do
     haddockFiles <- getHaddockFiles pb >>= newTVarIO
     haddockDeps <- newTVarIO mempty
 
-    forM_ packageMap $ \pi -> void $ async $ singleBuild pb registeredPackages
+    forM_ packageMap $ \pi -> void $ Control.Concurrent.Async.async $ singleBuild pb registeredPackages
       SingleBuild
         { sbSem = sem
         , sbErrsVar = errsVar
@@ -554,7 +554,7 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
                     (childDir </> "dist" </> "doc" </> "html" </> unpack name)
                     (pbDocDir pb </> unpack namever)
 
-                enewPath <- tryIO
+                enewPath <- tryIO'
                           $ canonicalizePath
                           $ fromString
                           $ pbDocDir pb
@@ -684,7 +684,7 @@ maximumTestSuiteTime = 10 * 60 * 1000 * 1000 -- ten minutes
 renameOrCopy :: FilePath -> FilePath -> IO ()
 renameOrCopy src dest =
     rename (fromString src) (fromString dest)
-    `catchIO` \_ -> copyDir src dest
+    `catchIO'` \_ -> copyDir src dest
 
 copyBuiltInHaddocks :: FilePath -> IO ()
 copyBuiltInHaddocks docdir = do
@@ -745,7 +745,7 @@ failureBS = "failure"
 
 getPreviousResult :: PerformBuild -> ResultType -> PackageIdentifier -> IO PrevResult
 getPreviousResult w x y = withPRPath w x y $ \fp -> do
-    eres <- tryIO $ readFile fp
+    eres <- tryIO' $ readFile fp
     return $ case eres of
         Right bs
             | bs == successBS -> PRSuccess
@@ -761,7 +761,7 @@ deletePreviousResults :: PerformBuild -> PackageIdentifier -> IO ()
 deletePreviousResults pb name =
     forM_ [minBound..maxBound] $ \rt ->
     withPRPath pb rt name $ \fp ->
-    void $ tryIO $ removeFile $ fromString fp
+    void $ tryIO' $ removeFile $ fromString fp
 
 -- | Discover existing .haddock files in the docs directory
 getHaddockFiles :: PerformBuild -> IO (Map Text FilePath)
@@ -855,7 +855,7 @@ createSetupHs dir name allowNewer = do
             else return gpd'
     let simple = buildType (packageDescription gpd) == Just Simple
     when simple $ do
-        _ <- tryIO $ removeFile $ fromString setuplhs
+        _ <- tryIO' $ removeFile $ fromString setuplhs
         writeFile setuphs $ asByteString "import Distribution.Simple\nmain = defaultMain\n"
     return gpd
   where
@@ -866,3 +866,9 @@ createSetupHs dir name allowNewer = do
 -- | Strip all version bounds from a GenericPackageDescription
 stripVersionBounds :: GenericPackageDescription -> GenericPackageDescription
 stripVersionBounds = everywhere $ mkT $ \(Dependency name _) -> Dependency name anyVersion
+
+tryIO' :: IO a -> IO (Either IOException a)
+tryIO' = try
+
+catchIO' :: IO a -> (IOException -> IO a) -> IO a
+catchIO' = catch

@@ -1,3 +1,7 @@
+## 0.14.1.1
+
+* Fix for latest nightly snapshot [#21](https://github.com/fpco/stackage-curator/issues/21)
+
 ## 0.14.1
 
 * configure-args

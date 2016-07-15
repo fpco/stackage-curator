@@ -33,7 +33,7 @@ import Stackage.BuildConstraints
 import Stackage.BuildPlan
 import Stackage.CheckBuildPlan
 import Stackage.PerformBuild
-import Stackage.Prelude          hiding (threadDelay, getNumCapabilities)
+import Stackage.Prelude          hiding (threadDelay, getNumCapabilities, Concurrently (..), withAsync)
 import Stackage.ServerBundle
 import Stackage.UpdateBuildPlan
 import Stackage.Upload
@@ -272,7 +272,7 @@ hackageDistro
 hackageDistro planFile target = do
     man <- newManager tlsManagerSettings
     plan <- decodeFileEither planFile >>= either throwM return
-    ecreds <- tryIO $ readFile "/hackage-creds"
+    ecreds <- tryIO' $ readFile "/hackage-creds"
     case map encodeUtf8 $ words $ decodeUtf8 $ either (const "") id ecreds of
         [username, password] -> do
             putStrLn $ "Uploading as Hackage distro: " ++ distroName
@@ -524,3 +524,6 @@ parMapM_ cnt f xs0 = do
 -- | Check if the given target is already used in the Github repos
 checkTargetAvailable :: Target -> IO ()
 checkTargetAvailable = void . checkoutRepo
+
+tryIO' :: IO a -> IO (Either IOException a)
+tryIO' = try
