@@ -1,11 +1,4 @@
-resolver: lts-5.13
-extra-deps:
-- Cabal-1.24.0.0
-- store-0.1.0.1
-- th-lift-instances-0.1.8
-- th-utilities-0.1.1.0
-- th-orphans-0.13.1
-- th-reify-many-0.1.6
+resolver: nightly-2016-07-31
 flags:
   stackage-curator:
-    monad_unlift_0_2: false
+    monad_unlift_0_2: true
