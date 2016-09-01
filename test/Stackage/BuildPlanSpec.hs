@@ -14,6 +14,7 @@ import           Stackage.BuildConstraints
 import           Stackage.BuildPlan
 import           Stackage.CheckBuildPlan
 import           Stackage.PackageDescription
+import           Stackage.PackageIndex
 import           Stackage.Prelude
 import           Stackage.UpdateBuildPlan
 import           Test.Hspec
@@ -61,7 +62,8 @@ check readPlanFile getPlans = do
     man <- newManager tlsManagerSettings
     bc <- readPlanFile man
     plans <- getPlans bc
-    bp <- newBuildPlan plans bc
+    allCabalHashesCommit <- getAllCabalHashesCommit
+    bp <- newBuildPlan allCabalHashesCommit plans bc
     let bs = Y.encode bp
         ebp' = Y.decodeEither bs
 
