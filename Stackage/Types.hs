@@ -122,11 +122,13 @@ data BuildPlan = BuildPlan
     , bpPackages    :: Map PackageName PackagePlan
     , bpGithubUsers :: Map Text (Set Text)
     , bpBuildToolOverrides :: Map Text (Set Text)
+    , bpAllCabalHashesCommit :: Maybe Text
     }
     deriving (Show, Eq)
 
 instance ToJSON BuildPlan where
     toJSON BuildPlan {..} = object
+        $ maybe id (\x -> (("all-cabal-hashes-commit" .= x):)) bpAllCabalHashesCommit
         [ "system-info" .= bpSystemInfo
         , "tools" .= fmap goTool bpTools
         , "packages" .= Map.mapKeysWith const unPackageName bpPackages
@@ -145,6 +147,7 @@ instance FromJSON BuildPlan where
         bpPackages <- Map.mapKeysWith const mkPackageName <$> (o .: "packages")
         bpGithubUsers <- o .:? "github-users" .!= mempty
         bpBuildToolOverrides <- o .:? "build-tool-overrides" .!= mempty
+        bpAllCabalHashesCommit <- o .:? "all-cabal-hashes-commit"
         return BuildPlan {..}
       where
         goTool = withObject "Tool" $ \o -> (,)

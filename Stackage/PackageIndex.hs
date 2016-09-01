@@ -21,6 +21,7 @@ module Stackage.PackageIndex
     , SimplifiedComponentInfo (..)
     , getLatestDescriptions
     , gpdFromLBS
+    , getAllCabalHashesCommit
     ) where
 
 import qualified Codec.Archive.Tar                     as Tar
@@ -55,6 +56,15 @@ getPackageIndexPath = liftIO $ do
     stackRoot <- getAppUserDataDirectory "stack"
     let tarball = stackRoot </> "indices" </> "Hackage" </> "00-index.tar"
     return tarball
+
+-- | Get the Git commit of the all-cabal-hashes repo at its current state
+getAllCabalHashesCommit :: MonadIO m => m Text
+getAllCabalHashesCommit = liftIO $ do
+    stackRoot <- getAppUserDataDirectory "stack"
+    let dir = stackRoot </> "indices" </> "Hackage" </> "git-update" </> "all-cabal-hashes"
+        cp = (proc "git" ["rev-parse", "HEAD"]) { cwd = Just dir }
+    withCheckedProcessCleanup cp $ \ClosedStream out ClosedStream ->
+        out $$ takeWhileCE (/= 10) =$ decodeUtf8C =$ foldC
 
 -- | A cabal file with name and version parsed from the filepath, and the
 -- package description itself ready to be parsed. It's left in unparsed form

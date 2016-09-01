@@ -29,8 +29,10 @@ import           Stackage.PackageIndex
 import           Stackage.Prelude
 
 -- | Make a build plan given these package set and build constraints.
-newBuildPlan :: MonadIO m => Map PackageName PackagePlan -> BuildConstraints -> m BuildPlan
-newBuildPlan packagesOrig bc@BuildConstraints {..} = liftIO $ do
+newBuildPlan :: MonadIO m
+             => Text -- ^ all-cabal-hashes repo commit
+             -> Map PackageName PackagePlan -> BuildConstraints -> m BuildPlan
+newBuildPlan allCabalHashesCommit packagesOrig bc@BuildConstraints {..} = liftIO $ do
     let toolMap :: Map ExeName (Set PackageName)
         toolMap = makeToolMap bcBuildToolOverrides packagesOrig
         packages = populateUsers $ removeUnincluded bc toolMap packagesOrig
@@ -49,6 +51,7 @@ newBuildPlan packagesOrig bc@BuildConstraints {..} = liftIO $ do
         , bpPackages = packages
         , bpGithubUsers = bcGithubUsers
         , bpBuildToolOverrides = bcBuildToolOverrides
+        , bpAllCabalHashesCommit = Just allCabalHashesCommit
         }
   where
     SystemInfo {..} = bcSystemInfo

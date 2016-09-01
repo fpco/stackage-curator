@@ -43,6 +43,7 @@ import Control.Monad.Trans.Unlift (askRunBase, MonadBaseUnlift)
 import Data.Function (fix)
 import Control.Concurrent.Async (Concurrently (..))
 import Stackage.Curator.UploadDocs (uploadDocs)
+import Stackage.PackageIndex (getAllCabalHashesCommit)
 import System.Directory (doesDirectoryExist, doesFileExist)
 
 -- | Flags passed in from the command line.
@@ -123,7 +124,8 @@ planFromConstraints :: MonadIO m => BuildConstraints -> m BuildPlan
 planFromConstraints bc = do
     putStrLn "Creating build plan"
     plans <- getLatestAllowedPlans bc
-    newBuildPlan plans bc
+    allCabalHashesCommit <- getAllCabalHashesCommit
+    newBuildPlan allCabalHashesCommit plans bc
 
 -- | Just print a message saying "still alive" every minute, to appease Travis.
 stillAlive :: IO () -> IO ()

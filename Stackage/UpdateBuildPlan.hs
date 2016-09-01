@@ -13,11 +13,13 @@ import           Distribution.Version      (anyVersion, earlierVersion,
                                             orLaterVersion)
 import           Stackage.BuildConstraints
 import           Stackage.BuildPlan
+import           Stackage.PackageIndex
 import           Stackage.Prelude
 
 updateBuildPlan :: Map PackageName PackagePlan -> BuildPlan -> IO BuildPlan
-updateBuildPlan packagesOrig
- = newBuildPlan packagesOrig . updateBuildConstraints
+updateBuildPlan packagesOrig bp = do
+    allCabalHashesCommit <- getAllCabalHashesCommit
+    newBuildPlan allCabalHashesCommit packagesOrig $ updateBuildConstraints bp
 
 updateBuildConstraints :: BuildPlan -> BuildConstraints
 updateBuildConstraints BuildPlan {..} =
