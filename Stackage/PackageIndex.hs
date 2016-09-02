@@ -62,7 +62,7 @@ getAllCabalHashesCommit :: MonadIO m => m Text
 getAllCabalHashesCommit = liftIO $ do
     stackRoot <- getAppUserDataDirectory "stack"
     let dir = stackRoot </> "indices" </> "Hackage" </> "git-update" </> "all-cabal-hashes"
-        cp = (proc "git" ["rev-parse", "HEAD"]) { cwd = Just dir }
+        cp = (proc "git" ["rev-parse", "current-hackage"]) { cwd = Just dir }
     withCheckedProcessCleanup cp $ \ClosedStream out ClosedStream ->
         out $$ takeWhileCE (/= 10) =$ decodeUtf8C =$ foldC
 

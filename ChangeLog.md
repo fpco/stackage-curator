@@ -1,6 +1,7 @@
 ## 0.14.2
 
 * Add `all-cabal-hashes-commit`
+* Add `tell-me-when-its-released`
 
 ## 0.14.1.1
 
