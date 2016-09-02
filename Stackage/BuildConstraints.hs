@@ -45,6 +45,8 @@ data BuildConstraints = BuildConstraints
     --
     -- Used to avoid situations like extra packages on Hackage providing the
     -- cabal executable
+
+    , bcTellMeWhenItsReleased :: Map PackageName Version
     }
 
 -- | Modify the version bounds with the given Dependencies
@@ -121,6 +123,7 @@ data ConstraintFile = ConstraintFile
     , cfSkippedLibProfiling     :: Set PackageName
     , cfGhcMajorVersion         :: Maybe (Int, Int)
     , cfTreatAsNonCore          :: Set PackageName
+    , cfTellMeWhenItsReleased   :: Map PackageName Version
     }
 
 instance FromJSON ConstraintFile where
@@ -142,6 +145,8 @@ instance FromJSON ConstraintFile where
         cfBuildToolOverrides <- o .:? "build-tool-overrides" .!= mempty
         cfGhcMajorVersion <- o .:? "ghc-major-version" >>= mapM parseMajorVersion
         cfTreatAsNonCore <- getPackages o "treat-as-non-core" <|> return mempty
+        cfTellMeWhenItsReleased <- (fmap mconcat $ o .: "tell-me-when-its-released" >>= mapM toNameVerMap)
+                               <|> return mempty
         return ConstraintFile {..}
       where
         goFlagMap = Map.mapKeysWith const FlagName
@@ -150,6 +155,10 @@ instance FromJSON ConstraintFile where
 
         toDep :: Monad m => Text -> m Dependency
         toDep = either (fail . show) return . simpleParse
+
+        toNameVerMap :: Monad m => Text -> m (Map PackageName Version)
+        toNameVerMap = either (fail . show) (\(PackageIdentifier x y) -> return $ singletonMap x y)
+                     . simpleParse
 
         parseMajorVersion t =
             case versionBranch <$> simpleParse t of
@@ -215,3 +224,4 @@ toBC ConstraintFile {..} = do
 
     bcGithubUsers = cfGithubUsers
     bcBuildToolOverrides = cfBuildToolOverrides
+    bcTellMeWhenItsReleased = cfTellMeWhenItsReleased

@@ -31,8 +31,35 @@ import           Stackage.Prelude
 -- | Make a build plan given these package set and build constraints.
 newBuildPlan :: MonadIO m
              => Text -- ^ all-cabal-hashes repo commit
-             -> Map PackageName PackagePlan -> BuildConstraints -> m BuildPlan
-newBuildPlan allCabalHashesCommit packagesOrig bc@BuildConstraints {..} = liftIO $ do
+             -> Map PackageName PackagePlan -- ^ latest allowed plans
+             -> Map PackageName Version -- ^ latest package version available
+             -> BuildConstraints
+             -> m BuildPlan
+newBuildPlan allCabalHashesCommit packagesOrig packagesLatest bc@BuildConstraints {..} = liftIO $ do
+    let newReleased = mapMaybe checkReleased $ mapToList bcTellMeWhenItsReleased
+        checkReleased (name, expectedVersion) =
+            case lookup name packagesLatest of
+                Nothing -> Just $ concat
+                    [ "No package version found for "
+                    , display name
+                    , ", expected version "
+                    , display expectedVersion
+                    ]
+                Just latestVersion
+                    | latestVersion == expectedVersion -> Nothing
+                    | otherwise -> Just $ concat
+                        [ "Mismatched package version found for "
+                        , display name
+                        , ", expected version "
+                        , display expectedVersion
+                        , ", latest version "
+                        , display latestVersion
+                        ]
+    unless (null newReleased) $ do
+        putStrLn "The following packages have new releases (see tell-me-when-its-released):"
+        mapM_ putStrLn newReleased
+        error "Exiting due to presence of new releases"
+
     let toolMap :: Map ExeName (Set PackageName)
         toolMap = makeToolMap bcBuildToolOverrides packagesOrig
         packages = populateUsers $ removeUnincluded bc toolMap packagesOrig
@@ -164,7 +191,7 @@ mkPackagePlan bc spd = do
     flags = mapWithKey overrideFlag $ spdPackageFlags spd
     overrideFlag name' defVal = fromMaybe defVal $ lookup name' overrides
 
-getLatestAllowedPlans :: MonadIO m => BuildConstraints -> m (Map PackageName PackagePlan)
+getLatestAllowedPlans :: MonadIO m => BuildConstraints -> m (Map PackageName PackagePlan, Map PackageName Version)
 getLatestAllowedPlans bc =
     getLatestDescriptions
         (isAllowed bc)

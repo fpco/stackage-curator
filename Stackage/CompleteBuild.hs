@@ -123,9 +123,9 @@ createPlan target dest constraints addPackages expectTestFailures expectBenchFai
 planFromConstraints :: MonadIO m => BuildConstraints -> m BuildPlan
 planFromConstraints bc = do
     putStrLn "Creating build plan"
-    plans <- getLatestAllowedPlans bc
+    (plans, latestVersions) <- getLatestAllowedPlans bc
     allCabalHashesCommit <- getAllCabalHashesCommit
-    newBuildPlan allCabalHashesCommit plans bc
+    newBuildPlan allCabalHashesCommit plans latestVersions bc
 
 -- | Just print a message saying "still alive" every minute, to appease Travis.
 stillAlive :: IO () -> IO ()

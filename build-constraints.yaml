@@ -3273,3 +3273,6 @@ build-tool-overrides:
 #
 # treat-as-non-core:
 # - transformers
+
+tell-me-when-its-released:
+- yesod-1.0

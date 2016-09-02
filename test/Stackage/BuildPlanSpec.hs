@@ -63,7 +63,7 @@ check readPlanFile getPlans = do
     bc <- readPlanFile man
     plans <- getPlans bc
     allCabalHashesCommit <- getAllCabalHashesCommit
-    bp <- newBuildPlan allCabalHashesCommit plans bc
+    bp <- newBuildPlan allCabalHashesCommit plans mempty bc
     let bs = Y.encode bp
         ebp' = Y.decodeEither bs
 

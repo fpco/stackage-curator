@@ -292,22 +292,28 @@ instance Exception CabalParseException
 getLatestDescriptions :: MonadIO m
                       => (PackageName -> Version -> Bool)
                       -> (SimplifiedPackageDescription -> IO desc)
-                      -> m (Map PackageName desc)
+                      -> m (Map PackageName desc, Map PackageName Version)
 getLatestDescriptions f parseDesc = liftIO $ do
     root <- fmap (</> "curator") $ getAppUserDataDirectory "stackage"
 
     -- Parse twice to avoid keeping stuff in memory: once to determine which
     -- versions to keep, once to do the actual parsing.
     liftIO $ putStrLn "Determining target package versions"
-    mvers <- runResourceT $ sourcePackageIndex $$ filterC f' =$ flip foldlC mempty
-        (\m ucf -> insertWith max (ucfName ucf) (ucfVersion ucf) m)
+    (mvers, latests) <- runResourceT $ sourcePackageIndex $$ getZipSink ((,)
+        -- get the latest, given the filter
+        <$> ZipSink (filterC f' =$ flip foldlC mempty
+            (\m ucf -> insertWith max (ucfName ucf) (ucfVersion ucf) m))
+        -- get the absolute latest
+        <*> ZipSink (flip foldlC mempty
+            (\m ucf -> insertWith max (ucfName ucf) (ucfVersion ucf) m)))
     liftIO $ putStrLn "Parsing package descriptions"
-    runResourceT $ sourcePackageIndex $$ flip foldMC mempty
+    plans <- runResourceT $ sourcePackageIndex $$ flip foldMC mempty
         (\m ucf ->
             if lookup (ucfName ucf) (asMap mvers) == Just (ucfVersion ucf)
                 then do
                     desc <- liftIO $ ucfParse root ucf >>= parseDesc
                     return $! insertMap (ucfName ucf) desc m
                 else return m)
+    return (plans, latests)
   where
     f' ucf = f (ucfName ucf) (ucfVersion ucf)

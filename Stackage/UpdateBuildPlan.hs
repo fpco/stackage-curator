@@ -19,7 +19,8 @@ import           Stackage.Prelude
 updateBuildPlan :: Map PackageName PackagePlan -> BuildPlan -> IO BuildPlan
 updateBuildPlan packagesOrig bp = do
     allCabalHashesCommit <- getAllCabalHashesCommit
-    newBuildPlan allCabalHashesCommit packagesOrig $ updateBuildConstraints bp
+    -- mempty, since when updating a build plan, we don't deal with tell-me-when-its-released
+    newBuildPlan allCabalHashesCommit packagesOrig mempty $ updateBuildConstraints bp
 
 updateBuildConstraints :: BuildPlan -> BuildConstraints
 updateBuildConstraints BuildPlan {..} =
@@ -29,6 +30,7 @@ updateBuildConstraints BuildPlan {..} =
     bcPackages = Map.keysSet bpPackages
     bcGithubUsers = bpGithubUsers
     bcBuildToolOverrides = bpBuildToolOverrides
+    bcTellMeWhenItsReleased = mempty -- we don't care when doing an update
 
     bcPackageConstraints name = PackageConstraints
         { pcVersionRange = addBumpRange (maybe anyVersion pcVersionRange moldPC)

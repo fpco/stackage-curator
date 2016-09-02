@@ -14,7 +14,7 @@ spec = do
                 [ (asText "base", asText "4.5.0.0")
                 , ("does-not-exist", "9999999999999999999")
                 ])
-        m <- getLatestDescriptions f return
+        (m, _) <- getLatestDescriptions f return
         length m `shouldBe` 1
         p <- simpleParse $ asText "base"
         v <- simpleParse $ asText "4.5.0.0"
