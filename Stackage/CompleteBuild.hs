@@ -89,7 +89,7 @@ createPlan target dest constraints addPackages expectTestFailures expectBenchFai
                         , ".yaml"
                         ]
                 putStrLn $ "Downloading old plan from " ++ pack url
-                req <- parseUrl url
+                req <- parseUrlThrow url
                 res <- httpLbs req man
                 oldplan <- either throwM return
                          $ decodeEither' (toStrict $ responseBody res)
@@ -485,7 +485,7 @@ fetch planFile = do
                 , "\n"
                 ]
             createTree $ parent fp
-            req <- parseUrl url
+            req <- parseUrlThrow url
             withResponse req man $ \res -> do
                 let tmp = F.encodeString fp <.> "tmp"
                 runResourceT $ bodyReaderSource (responseBody res) $$ sinkFile tmp

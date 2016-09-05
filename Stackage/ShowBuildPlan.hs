@@ -48,7 +48,7 @@ import           Data.Version                (Version)
 import           Data.Yaml                   (decodeFileEither)
 import           Distribution.Package        (PackageName)
 import           Network.HTTP.Client         (Manager, brRead, httpLbs,
-                                              newManager, parseUrl,
+                                              newManager, parseUrlThrow,
                                               responseBody, withResponse)
 import           Network.HTTP.Client.TLS     (tlsManagerSettings)
 import           Stackage.Types              (BuildPlan (..), Component (..),
@@ -277,7 +277,7 @@ yamlFP man spec' = do
 
 download :: Manager -> CompleteSpec -> FilePath -> IO ()
 download man spec dest = do
-    req <- parseUrl $ specUrl spec
+    req <- parseUrlThrow $ specUrl spec
     withResponse req man $ \res -> withBinaryFile dest WriteMode $ \h ->
         fix $ \loop -> do
             bs <- brRead $ responseBody res

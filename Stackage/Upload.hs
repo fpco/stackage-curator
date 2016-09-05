@@ -35,7 +35,7 @@ uploadHackageDistro
     -> Manager
     -> IO (Response LByteString)
 uploadHackageDistro name bp username password manager = do
-    req1 <- parseUrl $ concat
+    req1 <- parseUrlThrow $ concat
         [ "https://hackage.haskell.org/distro/"
         , unpack name
         , "/packages.csv"
@@ -74,7 +74,7 @@ uploadBundleV2 :: UploadBundleV2 -> Manager -> IO Text
 uploadBundleV2 UploadBundleV2 {..} man = IO.withBinaryFile ub2Bundle IO.ReadMode $ \h -> do
     size <- IO.hFileSize h
     putStrLn $ "Bundle size: " ++ tshow size
-    req1 <- parseUrl $ unpack $ unStackageServer ub2Server ++ "/upload2"
+    req1 <- parseUrlThrow $ unpack $ unStackageServer ub2Server ++ "/upload2"
     let req2 = req1
             { method = "PUT"
             , requestHeaders =

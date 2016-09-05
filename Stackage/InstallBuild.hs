@@ -74,7 +74,7 @@ installBuild installFlags@InstallFlags{..} = do
     plan <- case ifPlanSource of
         BPSBundleWeb url -> do
             man <- newManager tlsManagerSettings
-            req <- parseUrl url
+            req <- parseUrlThrow url
             res <- httpLbs req man
             planBSL <- getPlanEntry $ Tar.read $ GZip.decompress (responseBody res)
             decodeBuildPlan planBSL

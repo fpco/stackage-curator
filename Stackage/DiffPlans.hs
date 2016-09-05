@@ -89,7 +89,7 @@ getLTS :: String -> IO FilePath
 getLTS lts = do
     createDirectoryIfMissing True tmpDir
     man <- newManager tlsManagerSettings
-    req <- parseUrl $ ltsRepo <> lts <> ".yaml"
+    req <- parseUrlThrow $ ltsRepo <> lts <> ".yaml"
     res <- httpLbs req man
     writeFile fName $ responseBody res
     return fName

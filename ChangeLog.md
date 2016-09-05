@@ -2,6 +2,7 @@
 
 * Add `all-cabal-hashes-commit`
 * Add `tell-me-when-its-released`
+* Fix warnings for `parseUrl`
 
 ## 0.14.1.1
 
