@@ -23,6 +23,7 @@ import           Data.Byteable                 (toBytes)
 import qualified Data.ByteString.Base16        as B16
 import           Data.Conduit.Zlib             (WindowBits (WindowBits),
                                                 compress)
+import           Data.Function                 (fix)
 import           Data.XML.Types                (Content (ContentText), Event (EventBeginDoctype, EventEndDoctype, EventBeginElement),
                                                 Name)
 import           Distribution.Package          (PackageIdentifier (..))
@@ -67,9 +68,12 @@ upload toCompress env bucket name = do
            $ set poCacheControl (Just "maxage=31536000")
            $ set poACL (Just OPublicRead)
            $ putObject (BucketName bucket) (ObjectKey name) (toBody body)
-    putStrLn $ "Sending " ++ name
+
+    -- use ByteString output to ensure no interleaving of sending lines
+    hPut stdout $ encodeUtf8 $ "Sending " ++ name ++ "\n"
     _pors <- liftResourceT $ runAWS env $ send po
     return ()
+
 
 -- | Uses 'newEnv' for S3 credentials.
 uploadDocs :: FilePath -- ^ directory containing docs
@@ -83,7 +87,32 @@ uploadDocs input' bundleFile name bucket = do
     unlessM (Dir.doesDirectoryExist input') $ error $ "Could not find directory: " ++ show input'
     input <- fmap (</> "") $ Dir.canonicalizePath input'
 
-    let inner = sourceDirectoryDeep False input $$ mapM_C (go input name)
+    let inner :: M m => m ()
+        inner = do
+          let threads = 16
+              size = threads * 2
+          queue <- liftIO $ newTBQueueIO size
+          isOpenVar <- liftIO $ newTVarIO True
+          let readIO = liftIO $ atomically $
+                  (Just <$> readTBQueue queue) <|>
+                  (do isOpen <- readTVar isOpenVar
+                      checkSTM $ not isOpen
+                      return Nothing)
+              close = liftIO $ atomically $ writeTVar isOpenVar False
+
+              fillQueue = runResourceT $
+                (sourceDirectoryDeep False input
+                  $$ mapM_C (liftIO . atomically . writeTBQueue queue))
+                `finally` close
+
+              srcQueue = fix $ \loop -> do
+                mres <- readIO
+                case mres of
+                  Nothing -> return ()
+                  Just res -> yield res >> loop
+          run <- askRunBase
+          liftIO $ runConcurrently $
+            Concurrently fillQueue *> Concurrently (run $ srcQueue $$ mapM_C (go input name))
     runResourceT $ do
         ((), _, hoogles) <- runRWSIORefT inner (env, bucket) mempty
 
@@ -206,6 +235,7 @@ isRef _ = False
 
 type M m = ( MonadRWS (Env, Text) (Set FilePath) (Map FilePath Text, Set Text) m
            , MonadResource m
+           , MonadBaseUnlift IO m
            )
 
 getName :: M m => FilePath -> m Text
