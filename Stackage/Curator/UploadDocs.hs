@@ -112,7 +112,9 @@ uploadDocs input' bundleFile name bucket = do
                   Just res -> yield res >> loop
           run <- askRunBase
           liftIO $ runConcurrently $
-            Concurrently fillQueue *> Concurrently (run $ srcQueue $$ mapM_C (go input name))
+            Concurrently fillQueue *>
+              sequence_ (asList $ replicate threads
+                          (Concurrently (run $ srcQueue $$ mapM_C (go input name))))
     runResourceT $ do
         ((), _, hoogles) <- runRWSIORefT inner (env, bucket) mempty
 
