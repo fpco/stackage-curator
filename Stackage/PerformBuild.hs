@@ -6,6 +6,7 @@
 {-# LANGUAGE OverloadedStrings  #-}
 {-# LANGUAGE RecordWildCards    #-}
 {-# LANGUAGE FlexibleContexts   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Stackage.PerformBuild
     ( performBuild
     , PerformBuild (..)
@@ -39,6 +40,7 @@ import           Stackage.PackageDescription
 import           Stackage.PackageIndex       (gpdFromLBS)
 import           Stackage.Prelude            hiding (pi)
 import           System.Directory            (doesDirectoryExist, doesFileExist, findExecutable, getDirectoryContents)
+import qualified System.Directory
 import qualified System.FilePath             as FP
 import           System.Environment          (getEnvironment)
 import           System.Exit
@@ -752,10 +754,28 @@ getPreviousResult w x y = withPRPath w x y $ \fp -> do
             | bs == failureBS -> PRFailure
         _                     -> PRNoResult
 
+-- | Remove all previous results to avoid a broken cache
+removePreviousResults :: PerformBuild -> ResultType -> PackageName -> IO ()
+removePreviousResults pb rt name =
+    runResourceT
+        $ sourceDirectory dir
+       $$ filterC isOurPackage
+       =$ filterMC (liftIO . doesFileExist)
+       =$ mapM_C (liftIO . System.Directory.removeFile)
+  where
+    dir = pbPrevResDir pb </> show rt
+    prefix = display name ++ "-"
+
+    isOurPackage fp = fromMaybe False $ do
+        versionT <- stripPrefix prefix $ pack $ FP.takeFileName fp
+        _ :: Version <- simpleParse versionT
+        return True
+
 savePreviousResult :: PerformBuild -> ResultType -> PackageIdentifier -> Bool -> IO ()
-savePreviousResult pb rt ident res =
-    withPRPath pb rt ident $ \fp -> writeFile fp $
-        if res then successBS else failureBS
+savePreviousResult pb rt ident@(PackageIdentifier name _version) res =
+    withPRPath pb rt ident $ \fp -> do
+        removePreviousResults pb rt name
+        writeFile fp $ if res then successBS else failureBS
 
 deletePreviousResults :: PerformBuild -> PackageIdentifier -> IO ()
 deletePreviousResults pb name =
