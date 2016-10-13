@@ -940,6 +940,7 @@ catchIO' :: IO a -> (IOException -> IO a) -> IO a
 catchIO' = catch
 
 data BuildState = BSFullBuild | BSPartialBuild | NoBuild
+    deriving Show
 
 calculatePackageMap :: PerformBuild
                     -> Map PackageName Version -- ^ registered libraries
@@ -980,11 +981,26 @@ calculatePackageMap pb registered prevRes allInfos =
 
     loop buildStates0 = do
         buildStates1 <- foldM step' buildStates0 (mapToList allInfos)
-        case (null $ buildStates1 `difference` buildStates0, keys $ allInfos `Map.difference` buildStates1) of
-            (True, []) -> processBuildStates buildStates1
-            (False, _:_) -> loop buildStates1
-            (True, noBuildState) -> error $ "calculatePackageMap: No change in build states, but haven't solved all packages: " ++ show (map display noBuildState)
-            (False, []) -> error $ "calculatePackageMap: Solved all packages, but no change in build states"
+        case (keys $ buildStates1 `difference` buildStates0, keys $ allInfos `Map.difference` buildStates1) of
+            -- Added new build states, and no infos are unaccounted for, so
+            -- we're done
+            (_:_, []) -> processBuildStates buildStates1
+
+            -- Added new build states, but we still have some unaccounted for
+            -- packages, so loop
+            (_:_, _:_) -> loop buildStates1
+
+            -- Did not add any build states, but somehow all the infos are
+            -- accounted for. This is logically impossible, print an error.
+            ([], []) -> do
+                putStrLn $ "\n\ncalculatePackageMap: Solved all packages, but no change in build states"
+                mapM_ print $ mapToList buildStates1
+                putStrLn $ "\n\nPreviously missing packages:" ++ tshow (map display $ keys $ allInfos `Map.difference` buildStates0)
+                error "FIXME"
+
+            -- Did not add any build states, and we still have some infos
+            -- unaccounted for. That indicates some kind of cyclic dependency.
+            ([], noBuildState) -> error $ "calculatePackageMap: No change in build states, but haven't solved all packages: " ++ show (map display noBuildState)
       where
         step' buildStates (name, info) = do
             res <- step buildStates name info
@@ -995,7 +1011,7 @@ calculatePackageMap pb registered prevRes allInfos =
 
     step :: Map PackageName BuildState -> PackageName -> PackageInfo -> IO (Maybe BuildState)
     step states name pi =
-        go $ keys $ sdPackages desc
+        go $ keys $ Map.filter ((CompLibrary `member`) . diComponents) $ sdPackages desc
       where
         plan = piPlan pi
         desc = ppDesc plan
@@ -1009,7 +1025,7 @@ calculatePackageMap pb registered prevRes allInfos =
                 Nothing
                     -- It's in the build plan, so let's wait
                     | dep `member` allInfos -> do
-                        putStrLn $ concat -- FIXME debugging
+                        when False $ putStrLn $ concat -- debugging
                             [ display name
                             , ": don't know state of dep: "
                             , tshow dep
