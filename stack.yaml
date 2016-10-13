@@ -1,4 +1,4 @@
-resolver: nightly-2016-07-31
+resolver: lts-7.3
 flags:
   stackage-curator:
     monad_unlift_0_2: true

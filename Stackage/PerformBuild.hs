@@ -198,12 +198,6 @@ performBuild' pb@PerformBuild {..} = withBuildDir $ \builddir -> do
     sem <- atomically $ newTSem pbJobs
     active <- newTVarIO (0 :: Int)
     let toolMap = makeToolMap (bpBuildToolOverrides pbPlan) (bpPackages pbPlan)
-    packageMap <- fmap fold $ forM (mapToList $ bpPackages pbPlan)
-        $ \(name, plan) -> do
-            let piPlan = plan
-                piName = name
-            piResult <- newEmptyTMVarIO
-            return $ singletonMap name PackageInfo {..}
 
     errsVar <- newTVarIO mempty
     warningsVar <- newTVarIO id
@@ -216,6 +210,16 @@ performBuild' pb@PerformBuild {..} = withBuildDir $ \builddir -> do
         pbLog
         (ppVersion <$> bpPackages pbPlan)
         (deletePreviousResults pb)
+    allPreviousResults <- getAllPreviousResults pb
+
+    packageMap' <- fmap fold $ forM (mapToList $ bpPackages pbPlan)
+        $ \(name, plan) -> do
+            let piPlan = plan
+                piName = name
+            piResult <- newEmptyTMVarIO
+            return $ asMap $ singletonMap name PackageInfo {..}
+
+    packageMap <- calculatePackageMap pb registeredPackages allPreviousResults packageMap'
 
     pbLog "Collecting existing .haddock files\n"
     haddockFiles <- getHaddockFiles pb >>= newTVarIO
@@ -288,7 +292,7 @@ data SingleBuild = SingleBuild
     }
 
 singleBuild :: PerformBuild
-            -> Set PackageName -- ^ registered packages
+            -> Map PackageName Version -- ^ registered packages
             -> SingleBuild -> IO ()
 singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
     withCounter sbActive
@@ -745,6 +749,48 @@ successBS, failureBS :: ByteString
 successBS = "success"
 failureBS = "failure"
 
+getAllPreviousResults :: PerformBuild -> IO (PackageName -> ResultType -> Maybe (Version, PrevResult))
+getAllPreviousResults pb = do
+    m <- fmap fold $ forM [minBound..maxBound] $ \rt -> asMap . singletonMap rt <$> go rt
+    return $ \pn rt -> lookup rt m >>= lookup pn
+  where
+    go :: ResultType -> IO (Map PackageName (Version, PrevResult))
+    go rt = do
+        allResults <-
+               runResourceT
+             $ sourceDirectory dir
+            $$ filterMC (liftIO . doesFileExist)
+            =$ mapMC (liftIO . toMap)
+            =$ foldlC (unionWith union) mempty
+        fmap concat $ mapM (uncurry removeDupes) $ mapToList allResults
+      where
+        dir = pbPrevResDir pb </> show rt
+
+        toMap :: FilePath -> IO (Map PackageName (Map Version PrevResult))
+        toMap fp = do
+            case simpleParse $ pack $ FP.takeFileName fp of
+                Nothing -> return mempty
+                Just (PackageIdentifier name version) -> do
+                    eres <- tryIO' $ readFile fp
+                    let mres =
+                            case eres of
+                                Right bs
+                                    | bs == successBS -> Just PRSuccess
+                                    | bs == failureBS -> Just PRFailure
+                                _                     -> Nothing
+                    case mres of
+                        Nothing -> return mempty
+                        Just res -> return $ singletonMap name (singletonMap version res)
+
+        removeDupes :: PackageName -> Map Version PrevResult -> IO (Map PackageName (Version, PrevResult))
+        removeDupes name m =
+            case mapToList m of
+                [] -> assert False $ return mempty
+                [pair] -> return $ singletonMap name pair
+                _pairs -> do
+                    removePreviousResults pb rt name
+                    return mempty
+
 getPreviousResult :: PerformBuild -> ResultType -> PackageIdentifier -> IO PrevResult
 getPreviousResult w x y = withPRPath w x y $ \fp -> do
     eres <- tryIO' $ readFile fp
@@ -892,3 +938,99 @@ tryIO' = try
 
 catchIO' :: IO a -> (IOException -> IO a) -> IO a
 catchIO' = catch
+
+data BuildState = BSFullBuild | BSPartialBuild | NoBuild
+
+calculatePackageMap :: PerformBuild
+                    -> Map PackageName Version -- ^ registered libraries
+                    -> (PackageName -> ResultType -> Maybe (Version, PrevResult))
+                    -> Map PackageName PackageInfo
+                    -> IO (Map PackageName PackageInfo)
+calculatePackageMap pb registered prevRes allInfos =
+    loop initBuildStates
+  where
+    -- Calculate initial build states based on whether packages are
+    -- registered and previous results. This will not take into
+    -- account dependencies, which will be calculate by loop
+    initBuildStates :: Map PackageName BuildState
+    initBuildStates =
+        foldMap go $ mapToList allInfos
+      where
+        go :: (PackageName, PackageInfo) -> Map PackageName BuildState
+        go (name, info)
+            -- If this is a library and it's not registered, then we
+            -- need to do a full build
+            | isLib && lookup name registered /= Just version = singletonMap name BSFullBuild
+
+            -- If we have a previous successful build result which
+            -- matches our version, then we'll need to check
+            -- dependencies to know what to do
+            | Just (prevVer, prevRes) <- prevRes name Build
+            , prevVer == version && prevRes == PRSuccess = mempty
+
+            -- Something in the previous step failed, so do a full build
+            | otherwise = singletonMap name BSFullBuild
+          where
+            isLib = not $ null $ sdModules $ ppDesc plan
+            version = ppVersion plan
+            plan = piPlan info
+
+    loop buildStates0 = do
+        buildStates1 <- foldM step' buildStates0 (mapToList allInfos)
+        case (null $ buildStates1 `difference` buildStates0, null $ buildStates1 `Map.difference` allInfos) of
+            (True, True) -> processBuildStates buildStates1
+            (False, False) -> loop buildStates1
+            (True, False) -> error $ "calculatePackageMap: No change in build states, but haven't solved all packages"
+            (False, True) -> error $ "calculatePackageMap: Solved all packages, but no change in build states"
+      where
+        step' buildStates (name, info) = do
+            res <- step buildStates name info
+            return $
+                case res of
+                    Nothing -> buildStates
+                    Just bs -> insertMap name bs buildStates
+
+    step :: Map PackageName BuildState -> PackageName -> PackageInfo -> IO (Maybe BuildState)
+    step states name pi =
+        go $ keys $ sdPackages desc
+      where
+        plan = piPlan pi
+        desc = ppDesc plan
+
+        go (dep:deps) =
+            case lookup dep states of
+                -- don't know what to do with a dep, so don't know
+                -- what to do here either
+                Nothing -> return Nothing
+
+                -- dep will be rebuilt, so we need to be rebuilt too
+                Just BSFullBuild -> do
+                    putStrLn $ concat
+                        [ "Rebuilding "
+                        , display name
+                        , " due to dependency "
+                        , display dep
+                        ]
+                    return $ Just BSFullBuild
+
+                -- dep will not have its library rebuilt, so check the rest
+                Just BSPartialBuild -> go deps
+                Just NoBuild -> go deps
+
+        -- none of the dependencies will have their libraries rebuilt
+        go [] = return $ Just BSPartialBuild -- FIXME figure out if we have no need to build at all NoBuild
+
+    processBuildStates :: Map PackageName BuildState -> IO (Map PackageName PackageInfo)
+    processBuildStates buildStates =
+        fmap fold $ mapM go $ mapToList allInfos
+      where
+        go :: (PackageName, PackageInfo) -> IO (Map PackageName PackageInfo)
+        go (name, info) =
+            case lookup name buildStates of
+                Nothing -> error $ "processBuildStates: name not found " ++ show name
+                Just BSFullBuild -> do
+                    putStrLn $ "Removing all previous results for " ++ display name
+                    forM_ [minBound..maxBound] $ \rt -> removePreviousResults pb rt name
+                    return $ singletonMap name info
+                Just BSPartialBuild -> return $ singletonMap name info
+                Just NoBuild -> return mempty

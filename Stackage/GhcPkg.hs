@@ -25,7 +25,7 @@ setupPackageDatabase
     -> (ByteString -> IO ()) -- ^ logging
     -> Map PackageName Version -- ^ packages and versions to be installed
     -> (PackageIdentifier -> IO ()) -- ^ callback to be used when unregistering a package
-    -> IO (Set PackageName) -- ^ packages remaining in the database after cleanup
+    -> IO (Map PackageName Version) -- ^ packages remaining in the database after cleanup
 setupPackageDatabase mdb docDir log' toInstall onUnregister = do
     registered1 <- getRegisteredPackages flags
     forM_ registered1 $ \pi'@(PackageIdentifier name version) ->
@@ -34,7 +34,7 @@ setupPackageDatabase mdb docDir log' toInstall onUnregister = do
             _ -> return ()
     broken <- getBrokenPackages flags
     forM_ broken $ unregisterPackage log' onUnregister docDir flags
-    foldMap (\(PackageIdentifier name _) -> singletonSet name)
+    foldMap (\(PackageIdentifier name version) -> singletonMap name version)
         <$> getRegisteredPackages flags
   where
     flags = ghcPkgFlags mdb

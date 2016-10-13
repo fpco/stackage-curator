@@ -1,3 +1,8 @@
+## 0.14.3
+
+* Much improved logic for calculating if a package needs to be rebuilt
+  due to rebuilding a dependency
+
 ## 0.14.2
 
 * Add `all-cabal-hashes-commit`
