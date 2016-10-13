@@ -958,6 +958,9 @@ calculatePackageMap pb registered prevRes allInfos =
       where
         go :: (PackageName, PackageInfo) -> Map PackageName BuildState
         go (name, info)
+            -- If we're not going to build it, then don't build it
+            | pcSkipBuild (ppConstraints plan) = singletonMap name NoBuild
+
             -- If this is a library and it's not registered, then we
             -- need to do a full build
             | isLib && lookup name registered /= Just version = singletonMap name BSFullBuild
