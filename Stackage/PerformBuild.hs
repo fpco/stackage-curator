@@ -54,7 +54,7 @@ data BuildException = BuildException (Map PackageName BuildFailure) [Text]
 instance Exception BuildException
 instance Show BuildException where
     show (BuildException m warnings) =
-        unlines $ map go (mapToList m) ++ map unpack warnings
+        unlines $ "" : "" : "" : map go (mapToList m) ++ map unpack warnings
       where
         go (PackageName name, bf) = concat
             [ name
