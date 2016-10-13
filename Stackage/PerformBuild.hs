@@ -980,11 +980,11 @@ calculatePackageMap pb registered prevRes allInfos =
 
     loop buildStates0 = do
         buildStates1 <- foldM step' buildStates0 (mapToList allInfos)
-        case (null $ buildStates1 `difference` buildStates0, null $ buildStates1 `Map.difference` allInfos) of
-            (True, True) -> processBuildStates buildStates1
-            (False, False) -> loop buildStates1
-            (True, False) -> error $ "calculatePackageMap: No change in build states, but haven't solved all packages"
-            (False, True) -> error $ "calculatePackageMap: Solved all packages, but no change in build states"
+        case (null $ buildStates1 `difference` buildStates0, keys $ allInfos `Map.difference` buildStates1) of
+            (True, []) -> processBuildStates buildStates1
+            (False, _:_) -> loop buildStates1
+            (True, noBuildState) -> error $ "calculatePackageMap: No change in build states, but haven't solved all packages: " ++ show (map display noBuildState)
+            (False, []) -> error $ "calculatePackageMap: Solved all packages, but no change in build states"
       where
         step' buildStates (name, info) = do
             res <- step buildStates name info
@@ -1000,11 +1000,25 @@ calculatePackageMap pb registered prevRes allInfos =
         plan = piPlan pi
         desc = ppDesc plan
 
+        go (dep:deps) | dep == name = go deps
         go (dep:deps) =
             case lookup dep states of
-                -- don't know what to do with a dep, so don't know
-                -- what to do here either
-                Nothing -> return Nothing
+                -- Don't know what to do with a dep. Let's see if it's
+                -- actually in the build plan (as opposed to a core
+                -- library)
+                Nothing
+                    -- It's in the build plan, so let's wait
+                    | dep `member` allInfos -> do
+                        putStrLn $ concat -- FIXME debugging
+                            [ display name
+                            , ": don't know state of dep: "
+                            , tshow dep
+                            ]
+                        return Nothing
+
+                    -- Not in the build plan, so ignore and move on
+                    -- (e.g., the base package)
+                    | otherwise -> go deps
 
                 -- dep will be rebuilt, so we need to be rebuilt too
                 Just BSFullBuild -> do
