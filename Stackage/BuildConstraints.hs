@@ -20,6 +20,7 @@ module Stackage.BuildConstraints
 
 import           Control.Monad.Writer.Strict (execWriter, tell)
 import           Data.Aeson
+import           Data.Aeson.Internal         ((<?>), JSONPathElement (Key))
 import qualified Data.Map                    as Map
 import           Data.Yaml                   (decodeEither', decodeFileEither)
 import           Distribution.Package        (Dependency (..))
@@ -146,7 +147,7 @@ instance FromJSON ConstraintFile where
         cfGhcMajorVersion <- o .:? "ghc-major-version" >>= mapM parseMajorVersion
         cfTreatAsNonCore <- getPackages o "treat-as-non-core" <|> return mempty
         cfTellMeWhenItsReleased <- (fmap mconcat $ o .: "tell-me-when-its-released" >>= mapM toNameVerMap)
-                               <|> return mempty
+                               <?> Key "tell-me-when-its-released"
         return ConstraintFile {..}
       where
         goFlagMap = Map.mapKeysWith const FlagName
