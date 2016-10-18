@@ -18,3 +18,5 @@ github-users:
 package-flags:
   foo:
     demo: true
+
+tell-me-when-its-released: []
