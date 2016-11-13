@@ -66,7 +66,7 @@ checkDeps :: (PackageName -> Maybe Maintainer)
 checkDeps getMaint allPackages (user, pb) =
     mapM_ go $ mapToList $ sdPackages $ ppDesc pb
   where
-    go (dep, diRange -> range) =
+    go (dep, depInfo@(DepInfo _ range)) =
         case lookup dep allPackages of
             Nothing -> tell $ BadBuildPlan (singletonMap (dep, getMaint dep, Nothing) errMap) mempty
             Just (version,deps)
@@ -83,7 +83,7 @@ checkDeps getMaint allPackages (user, pb) =
                     (dep, getMaint dep, Just version)
                     errMap) mempty
       where
-        errMap = singletonMap pu range
+        errMap = singletonMap pu depInfo
         pu = PkgUser
             { puName = user
             , puVersion = ppVersion pb
@@ -158,7 +158,7 @@ pkgUserShow2 PkgUser {..} = unwords
     : map (cons '@') (setToList puGithubPings)
 
 data BadBuildPlan = BadBuildPlan
-     (Map (PackageName, Maybe Maintainer, Maybe Version) (Map PkgUser VersionRange))
+     (Map (PackageName, Maybe Maintainer, Maybe Version) (Map PkgUser DepInfo))
      (Map PackageName (Vector Text))
     deriving Typeable
 instance Exception BadBuildPlan
@@ -195,8 +195,8 @@ instance Show BadBuildPlan where
             , ")"
             ]
 
-        showUser :: (PkgUser, VersionRange) -> Text
-        showUser (pu, range) = concat
+        showUser :: (PkgUser, DepInfo) -> Text
+        showUser (pu, (DepInfo comps range)) = concat
             [ "- [ ] "
             , pkgUserShow1 pu
             , " ("
@@ -205,6 +205,8 @@ instance Show BadBuildPlan where
             , T.replace "<" "< " $ display range
             , "). "
             , pkgUserShow2 pu
+            , ". Used by: "
+            , intercalate ", " $ map compToText $ setToList comps
             ]
 
         go2 :: (PackageName, Vector Text) -> Text
@@ -215,5 +217,5 @@ instance Show BadBuildPlan where
 instance Monoid BadBuildPlan where
     mempty = BadBuildPlan mempty mempty
     mappend (BadBuildPlan a x) (BadBuildPlan b y) = BadBuildPlan
-        (unionWith (unionWith intersectVersionRanges) a b)
+        (unionWith mappend a b)
         (unionWith mappend x y)

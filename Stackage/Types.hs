@@ -29,6 +29,7 @@ module Stackage.Types
     , unFlagName
     , mkFlagName
     , intersectVersionRanges
+    , compToText
     ) where
 
 import           Control.Applicative             ((<|>))

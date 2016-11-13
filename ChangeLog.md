@@ -2,6 +2,7 @@
 
 * Much improved logic for calculating if a package needs to be rebuilt
   due to rebuilding a dependency
+* Include components using a dependency is check output
 
 ## 0.14.2
 
