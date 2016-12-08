@@ -82,7 +82,7 @@ uploadDocs :: FilePath -- ^ directory containing docs
            -> Text -- ^ bucket name
            -> IO ()
 uploadDocs input' bundleFile name bucket = do
-    env <- newEnv NorthVirginia Discover
+    env <- newEnv Discover
 
     unlessM (Dir.doesDirectoryExist input') $ error $ "Could not find directory: " ++ show input'
     input <- fmap (</> "") $ Dir.canonicalizePath input'

@@ -27,7 +27,7 @@ uploadIndex
     -> Text -- ^ key prefix
     -> IO ()
 uploadIndex bpFile target bucket prefix = do
-    env <- newEnv NorthVirginia Discover
+    env <- newEnv Discover
     bp <- decodeFileEither bpFile >>= either throwM return
     let toInclude = getToInclude bp
     runResourceT $ do

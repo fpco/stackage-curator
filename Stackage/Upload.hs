@@ -35,7 +35,7 @@ uploadHackageDistro
     -> Manager
     -> IO (Response LByteString)
 uploadHackageDistro name bp username password manager = do
-    req1 <- parseUrlThrow $ concat
+    req1 <- parseRequest $ concat
         [ "https://hackage.haskell.org/distro/"
         , unpack name
         , "/packages.csv"
@@ -43,7 +43,6 @@ uploadHackageDistro name bp username password manager = do
     let req2 = req1
                 { requestHeaders = [("Content-Type", "text/csv")]
                 , requestBody = RequestBodyLBS csv
-                , checkStatus = \_ _ _ -> Nothing
                 , method = "PUT"
                 }
     httpLbs (applyBasicAuth username password req2) manager

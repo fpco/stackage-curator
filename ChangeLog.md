@@ -1,3 +1,7 @@
+## 0.14.4
+
+* Support latest Stackage Nightly [#27](https://github.com/fpco/stackage-curator/issues/27)
+
 ## 0.14.3
 
 * Much improved logic for calculating if a package needs to be rebuilt
