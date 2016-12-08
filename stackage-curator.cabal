@@ -1,5 +1,5 @@
 name:                stackage-curator
-version:             0.14.4
+version:             0.14.4.1
 synopsis:            Tools for curating Stackage bundles
 description:         Please see <http://www.stackage.org/package/stackage-curator> for a description and documentation.
 homepage:            https://github.com/fpco/stackage-curator

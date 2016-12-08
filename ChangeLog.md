@@ -1,3 +1,7 @@
+## 0.14.4.1
+
+* A few missing fixes
+
 ## 0.14.4
 
 * Support latest Stackage Nightly [#27](https://github.com/fpco/stackage-curator/issues/27)

@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 import           Data.Aeson                (toJSON)
-import           Data.Aeson.Encode         (encodeToTextBuilder)
+import           Data.Aeson.Text           (encodeToTextBuilder)
 import qualified Data.Text                 as T
 import qualified Data.Text.Lazy            as TL
 import           Data.Text.Lazy.Builder    (toLazyText)
@@ -10,6 +10,7 @@ import           Options.Applicative
 import           Options.Applicative.Simple (simpleOptions, simpleVersion)
 import           Paths_stackage_curator    (version)
 import           Stackage.ShowBuildPlan
+import           Data.Monoid               ((<>))
 
 main :: IO ()
 main = do
