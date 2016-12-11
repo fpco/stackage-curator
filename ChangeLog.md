@@ -1,6 +1,7 @@
 ## 0.14.5
 
 * Add support for the `hide` field [yesodweb/wai#579](https://github.com/yesodweb/wai/issues/579)
+* `list-revdeps` command [#28](https://github.com/fpco/stackage-curator/issues/28)
 
 ## 0.14.4.1
 

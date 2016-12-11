@@ -9,6 +9,7 @@ import           Options.Applicative
 import           Options.Applicative.Simple   (simpleOptions, simpleVersion, addCommand)
 import           Paths_stackage_curator       (version)
 import           Stackage.CompleteBuild
+import           Stackage.Curator.RevDeps
 import           Stackage.Curator.UploadIndex
 import           Stackage.DiffPlans
 import           Stackage.InstallBuild
@@ -73,6 +74,8 @@ main = do
                 <*> pure (T.pack "package-index/"))
         addCommand "upload-docs" "Upload documentation to an S3 bucket" id
             (uploadDocs' <$> target <*> bundleFile)
+        addCommand "list-revdeps" "List reverse dependencies" id
+            (listRevDeps <$> planFile <*> deepRevDeps <*> revDepPackage)
 
     makeBundle' = makeBundle
         <$> planFile
@@ -333,3 +336,12 @@ main = do
         switch
             (long "html" <> short 'h' <>
              help "Wrap the output in HTML <ul>/<li> tags")
+
+    deepRevDeps =
+        switch
+            (long "deep" <>
+             help "List deep reverse dependencies, not just immediate users")
+
+    revDepPackage = argument packageRead
+        (metavar "PACKAGE-NAME" ++
+         help "Package to list reverse deps for")

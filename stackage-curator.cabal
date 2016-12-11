@@ -34,6 +34,7 @@ library
                        Stackage.Upload
                        Stackage.PerformBuild
                        Stackage.CompleteBuild
+                       Stackage.Curator.RevDeps
                        Stackage.Curator.UploadDocs
                        Stackage.Curator.UploadIndex
                        Stackage.ShowBuildPlan
