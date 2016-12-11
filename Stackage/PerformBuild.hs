@@ -410,6 +410,14 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
             Nothing -> rest
             Just db -> ("-package-db=" ++ pack db) : rest)
 
+    ghcPkgArgs :: [Text] -> [Text]
+    ghcPkgArgs rest =
+          "--package-db=clear"
+        : "--package-db=global"
+        : (case pbDatabase pb of
+            Nothing -> rest
+            Just db -> ("--package-db=" ++ pack db) : rest)
+
     configArgs = ($ []) $ execWriter $ do
         tell' "--package-db=clear"
         tell' "--package-db=global"
@@ -497,7 +505,7 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
                         ]
                     return True
                 | otherwise -> return False
-        when toBuild $ withConfiged $ \_childDir cabal -> do
+        when toBuild $ withConfiged $ \childDir cabal -> do
             deletePreviousResults pb pident
 
             log' $ "Building " ++ namever
@@ -505,8 +513,11 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
 
             log' $ "Copying/registering " ++ namever
             cabal ["copy"]
-            withMVar sbRegisterMutex $ const $
+            withMVar sbRegisterMutex $ const $ do
                 cabal ["register"]
+                when pcHide $ do
+                    log' $ "Hiding " ++ namever
+                    runIn childDir getOutH "ghc-pkg" $ ghcPkgArgs ["hide", namever]
 
             savePreviousResult pb Build pident True
 

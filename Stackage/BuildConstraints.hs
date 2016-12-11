@@ -22,6 +22,7 @@ import           Control.Monad.Writer.Strict (execWriter, tell)
 import           Data.Aeson
 import           Data.Aeson.Internal         ((<?>), JSONPathElement (Key))
 import qualified Data.Map                    as Map
+import qualified Data.Set                    as Set
 import           Data.Yaml                   (decodeEither', decodeFileEither)
 import           Distribution.Package        (Dependency (..))
 import qualified Distribution.System
@@ -125,6 +126,8 @@ data ConstraintFile = ConstraintFile
     , cfGhcMajorVersion         :: Maybe (Int, Int)
     , cfTreatAsNonCore          :: Set PackageName
     , cfTellMeWhenItsReleased   :: Map PackageName Version
+    , cfHide                    :: Set PackageName
+    -- ^ Packages which should be hidden after registering
     }
 
 instance FromJSON ConstraintFile where
@@ -148,6 +151,7 @@ instance FromJSON ConstraintFile where
         cfTreatAsNonCore <- getPackages o "treat-as-non-core" <|> return mempty
         cfTellMeWhenItsReleased <- (fmap mconcat $ o .: "tell-me-when-its-released" >>= mapM toNameVerMap)
                                <?> Key "tell-me-when-its-released"
+        cfHide <- Set.map PackageName <$> o .:? "hide" .!= mempty
         return ConstraintFile {..}
       where
         goFlagMap = Map.mapKeysWith const FlagName
@@ -222,6 +226,7 @@ toBC ConstraintFile {..} = do
         pcFlagOverrides = fromMaybe mempty $ lookup name cfPackageFlags
         pcConfigureArgs = fromMaybe mempty $ lookup name cfConfigureArgs
         pcSkipBuild = name `member` cfSkippedBuilds
+        pcHide = name `member` cfHide
 
     bcGithubUsers = cfGithubUsers
     bcBuildToolOverrides = cfBuildToolOverrides

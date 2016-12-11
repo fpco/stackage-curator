@@ -254,6 +254,9 @@ data PackageConstraints = PackageConstraints
     -- ^ Don't even bother building this library, useful when dealing with
     -- OS-specific packages. See:
     -- https://github.com/fpco/stackage-curator/issues/3
+    , pcHide             :: !Bool
+    -- ^ Hide this package after registering, useful for avoiding
+    -- module name conflicts
     }
     deriving (Show, Eq)
 instance ToJSON PackageConstraints where
@@ -291,6 +294,7 @@ instance FromJSON PackageConstraints where
         pcEnableLibProfile <- fmap (fromMaybe True) (o .:? "library-profiling")
         pcSkipBuild <- o .:? "skip-build" .!= False
         pcConfigureArgs <- o .:? "configure-args" .!= mempty
+        pcHide <- o .:? "hide" .!= False
         return PackageConstraints {..}
 
 data TestState = ExpectSuccess

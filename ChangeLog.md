@@ -1,3 +1,7 @@
+## 0.14.5
+
+* Add support for the `hide` field [yesodweb/wai#579](https://github.com/yesodweb/wai/issues/579)
+
 ## 0.14.4.1
 
 * A few missing fixes
