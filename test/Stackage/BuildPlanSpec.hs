@@ -125,7 +125,8 @@ makePackageSet ps _ =
                         ,pcBenches = Don'tBuild
                         ,pcFlagOverrides = mempty
                         ,pcEnableLibProfile = False
-                        ,pcSkipBuild = False}
+                        ,pcSkipBuild = False
+                        ,pcHide = False}
                 ,ppDesc =
                     SimpleDesc
                         {sdPackages = deps
