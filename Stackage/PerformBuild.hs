@@ -412,8 +412,7 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
 
     ghcPkgArgs :: [Text] -> [Text]
     ghcPkgArgs rest =
-          "--package-db=clear"
-        : "--package-db=global"
+          "--no-user-package-db"
         : (case pbDatabase pb of
             Nothing -> rest
             Just db -> ("--package-db=" ++ pack db) : rest)
