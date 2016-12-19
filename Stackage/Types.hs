@@ -276,6 +276,7 @@ instance ToJSON PackageConstraints where
         , "library-profiling" .= pcEnableLibProfile
         , "skip-build" .= pcSkipBuild
         , "configure-args" .= pcConfigureArgs
+        , "hide" .= pcHide
         ]
       where
         addMaintainer = maybe id (\m -> (("maintainer" .= m):)) pcMaintainer
