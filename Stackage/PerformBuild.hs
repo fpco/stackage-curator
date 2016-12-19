@@ -404,7 +404,8 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
 
     runghcArgs :: [Text] -> [Text]
     runghcArgs rest =
-          "-no-user-package-db"
+          "-clear-package-db"
+        : "-global-package-db"
         : (case pbDatabase pb of
             Nothing -> rest
             Just db -> ("-package-db=" ++ pack db) : rest)
