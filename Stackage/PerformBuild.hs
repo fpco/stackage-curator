@@ -991,6 +991,12 @@ calculatePackageMap pb registered prevRes allInfos =
 
     loop buildStates0 = do
         buildStates1 <- foldM step' buildStates0 (mapToList allInfos)
+        putStrLn $ concat
+            [ "Debugging: added "
+            , tshow $ length buildStates1 - length buildStates0
+            , "keys, new keys == "
+            , tshow (map display $ keys $ buildStates1 `Map.difference` buildStates0)
+            ]
         case (keys $ buildStates1 `difference` buildStates0, keys $ allInfos `Map.difference` buildStates1) of
             -- Added new build states, and no infos are unaccounted for, so
             -- we're done
