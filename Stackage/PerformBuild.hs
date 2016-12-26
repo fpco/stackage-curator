@@ -957,12 +957,8 @@ calculatePackageMap :: PerformBuild
                     -> (PackageName -> ResultType -> Maybe (Version, PrevResult))
                     -> Map PackageName PackageInfo
                     -> IO (Map PackageName PackageInfo)
-calculatePackageMap pb registered prevRes allInfos
-    | null initBuildStates = error $ concat
-        [ "calculatePackageMap: have a null initBuildStates, length of allInfos == "
-        , show $ length allInfos
-        ]
-    | otherwise = loop initBuildStates
+calculatePackageMap pb registered prevRes allInfos =
+    loop initBuildStates
   where
     -- Calculate initial build states based on whether packages are
     -- registered and previous results. This will not take into
@@ -1010,6 +1006,11 @@ calculatePackageMap pb registered prevRes allInfos
             -- packages, so loop
             (_:_, _:_) -> loop buildStates1
 
+            ([], []) -> processBuildStates buildStates1
+
+            {- FIXME make this testing more robust
+            (_:_, _:_) -> loop buildStates1
+
             -- Did not add any build states, but somehow all the infos are
             -- accounted for. This is logically impossible, print an error.
             ([], []) -> do
@@ -1025,6 +1026,7 @@ calculatePackageMap pb registered prevRes allInfos
                     , tshow $ length buildStates0
                     ]
                 error "FIXME"
+            -}
 
             -- Did not add any build states, and we still have some infos
             -- unaccounted for. That indicates some kind of cyclic dependency.
