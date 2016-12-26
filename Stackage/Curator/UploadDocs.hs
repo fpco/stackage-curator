@@ -189,7 +189,7 @@ go input name fp
         -- Sink to a Document and then use blaze-html to render to avoid using
         -- XML rendering rules (e.g., empty elements)
         upload' True key $ sourceLazy (renderHtml $ toHtml doc)
-    | any (F.hasExtension $ fromString fp) $ words "css js png svg gif" = void $ getName fp
+    | any (F.hasExtension $ fromString fp) $ words "css js png gif" = void $ getName fp
     | otherwise = upload' True key $ sourceFile fp
   where
     Just suffix = F.stripPrefix (fromString input F.</> "") (fromString fp)
