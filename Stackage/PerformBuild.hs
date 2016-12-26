@@ -995,7 +995,7 @@ calculatePackageMap pb registered prevRes allInfos
 
     loop buildStates0 = do
         buildStates1 <- foldM step' buildStates0 (mapToList allInfos)
-        when False $ putStrLn $ concat
+        putStrLn $ concat
             [ "Debugging: added "
             , tshow $ length buildStates1 - length buildStates0
             , " keys, new keys == "
@@ -1016,6 +1016,14 @@ calculatePackageMap pb registered prevRes allInfos
                 putStrLn $ "\n\ncalculatePackageMap: Solved all packages, but no change in build states"
                 mapM_ print $ mapToList buildStates1
                 putStrLn $ "\n\nPreviously missing packages:" ++ tshow (map display $ keys $ allInfos `Map.difference` buildStates0)
+                putStrLn $ concat
+                    [ "length allInfos: "
+                    , tshow $ length allInfos
+                    , ", length buildStates1: "
+                    , tshow $ length buildStates1
+                    , ", length buildStates0: "
+                    , tshow $ length buildStates0
+                    ]
                 error "FIXME"
 
             -- Did not add any build states, and we still have some infos
