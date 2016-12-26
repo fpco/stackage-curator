@@ -957,8 +957,12 @@ calculatePackageMap :: PerformBuild
                     -> (PackageName -> ResultType -> Maybe (Version, PrevResult))
                     -> Map PackageName PackageInfo
                     -> IO (Map PackageName PackageInfo)
-calculatePackageMap pb registered prevRes allInfos =
-    loop initBuildStates
+calculatePackageMap pb registered prevRes allInfos
+    | null initBuildStates = error $ concat
+        [ "calculatePackageMap: have a null initBuildStates, length of allInfos == "
+        , show $ length allInfos
+        ]
+    | otherwise = loop initBuildStates
   where
     -- Calculate initial build states based on whether packages are
     -- registered and previous results. This will not take into
@@ -991,10 +995,10 @@ calculatePackageMap pb registered prevRes allInfos =
 
     loop buildStates0 = do
         buildStates1 <- foldM step' buildStates0 (mapToList allInfos)
-        putStrLn $ concat
+        when False $ putStrLn $ concat
             [ "Debugging: added "
             , tshow $ length buildStates1 - length buildStates0
-            , "keys, new keys == "
+            , " keys, new keys == "
             , tshow (map display $ keys $ buildStates1 `Map.difference` buildStates0)
             ]
         case (keys $ buildStates1 `difference` buildStates0, keys $ allInfos `Map.difference` buildStates1) of
