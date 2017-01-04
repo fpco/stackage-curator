@@ -408,7 +408,13 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
         : "-global-package-db"
         : (case pbDatabase pb of
             Nothing -> rest
-            Just db -> ("-package-db=" ++ pack db) : rest)
+            Just db -> ("-package-db=" ++ pack db) : rest) ++ setupPackages
+
+    setupPackages :: [Text]
+    setupPackages =
+        case sdSetupDeps $ ppDesc $ piPlan sbPackageInfo of
+            Nothing -> []
+            Just pkgs -> "-hide-all-packages" : map (("--package=" ++) . display) (setToList pkgs)
 
     ghcPkgArgs :: [Text] -> [Text]
     ghcPkgArgs rest =

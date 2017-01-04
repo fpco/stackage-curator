@@ -133,7 +133,8 @@ makePackageSet ps _ =
                         ,sdTools = mempty
                         ,sdProvidedExes = mempty
                         ,sdModules = mempty
-                        ,sdCabalVersion = mempty}}
+                        ,sdCabalVersion = mempty
+                        ,sdSetupDeps = Nothing}}
 
 -- | This exact version is required.
 thisV :: [Int] -> VersionRange

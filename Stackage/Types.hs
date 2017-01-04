@@ -379,18 +379,20 @@ data SimpleDesc = SimpleDesc
     -- ^ modules exported by the library
     , sdCabalVersion :: Option (Max Version)
     -- ^ minimum acceptable Cabal version
+    , sdSetupDeps    :: Maybe (Set PackageName)
     }
     deriving (Show, Eq)
 instance Monoid SimpleDesc where
-    mempty = SimpleDesc mempty mempty mempty mempty mempty
-    mappend (SimpleDesc a b c d e) (SimpleDesc w x y z e') = SimpleDesc
+    mempty = SimpleDesc mempty mempty mempty mempty mempty mempty
+    mappend (SimpleDesc a b c d e f) (SimpleDesc w x y z e' f') = SimpleDesc
         (Map.unionWith (<>) a w)
         (Map.unionWith (<>) b x)
         (c <> y)
         (d <> z)
         (e <> e')
+        (f <> f')
 instance ToJSON SimpleDesc where
-    toJSON SimpleDesc {..} = object $ addCabalVersion
+    toJSON SimpleDesc {..} = object $ addSetupDeps $ addCabalVersion
         [ "packages" .= Map.mapKeysWith const unPackageName sdPackages
         , "tools" .= Map.mapKeysWith const unExeName sdTools
         , "provided-exes" .= sdProvidedExes
@@ -401,6 +403,10 @@ instance ToJSON SimpleDesc where
           case sdCabalVersion of
               Option (Just (Max v)) -> ("cabal-version" .= display v) : rest
               Option Nothing -> rest
+        addSetupDeps rest =
+          case sdSetupDeps of
+            Just deps -> ("setup-deps" .= map display (Set.toList deps)) : rest
+            Nothing -> rest
 instance FromJSON SimpleDesc where
     parseJSON = withObject "SimpleDesc" $ \o -> do
         sdPackages <- Map.mapKeysWith const mkPackageName <$> (o .: "packages")
@@ -410,6 +416,9 @@ instance FromJSON SimpleDesc where
         sdCabalVersion <- o .:? "cabal-version" >>= maybe
                             (return $ Option Nothing)
                             (either (fail . show) (return . Option . Just . Max) . simpleParse)
+        sdSetupDeps <- o .:? "setup-deps" >>= maybe
+            (return Nothing)
+            (either (fail . show) (return . Just . Set.fromList) . mapM simpleParse)
         return SimpleDesc {..}
 
 data DepInfo = DepInfo

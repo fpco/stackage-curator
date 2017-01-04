@@ -101,7 +101,7 @@ data SimplifiedPackageDescription = SimplifiedPackageDescription
     , spdCondExecutables :: [(String, CondTree ConfVar [Dependency] SimplifiedComponentInfo)]
     , spdCondTestSuites :: [(String, CondTree ConfVar [Dependency] SimplifiedComponentInfo)]
     , spdCondBenchmarks :: [(String, CondTree ConfVar [Dependency] SimplifiedComponentInfo)]
-    , spdSetupDeps :: [Dependency]
+    , spdSetupDeps :: Maybe [Dependency]
     , spdPackageFlags :: Map FlagName Bool
     , spdGithubPings :: Set Text
     , spdCabalVersion :: Maybe Version
@@ -160,7 +160,7 @@ gpdToSpd raw gpd = SimplifiedPackageDescription
     , spdCondExecutables = map (fmap $ mapCondTree simpleExe) $ condExecutables gpd
     , spdCondTestSuites = map (fmap $ mapCondTree simpleTest) $ condTestSuites gpd
     , spdCondBenchmarks = map (fmap $ mapCondTree simpleBench) $ condBenchmarks gpd
-    , spdSetupDeps = maybe [] setupDepends $ setupBuildInfo $ packageDescription gpd
+    , spdSetupDeps = fmap setupDepends $ setupBuildInfo $ packageDescription gpd
     , spdPackageFlags =
         let getFlag MkFlag {..} = (flagName, flagDefault)
          in mapFromList $ map getFlag $ genPackageFlags gpd
