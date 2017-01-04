@@ -38,7 +38,7 @@ import           Distribution.ParseUtils               (PError)
 import           Distribution.System                   (Arch, OS)
 import           Stackage.Prelude
 import           Stackage.GithubPings
-import           System.Directory                      (getAppUserDataDirectory, createDirectoryIfMissing)
+import           System.Directory                      (getAppUserDataDirectory, createDirectoryIfMissing, doesFileExist)
 import           System.FilePath                       (takeDirectory)
 import qualified Data.ByteString.Base16                as B16
 import qualified Crypto.Hash.SHA256                    as SHA256
@@ -54,8 +54,17 @@ import qualified Data.Store.TypeHash                   as Store
 getPackageIndexPath :: MonadIO m => m FilePath
 getPackageIndexPath = liftIO $ do
     stackRoot <- getAppUserDataDirectory "stack"
-    let tarball = stackRoot </> "indices" </> "Hackage" </> "00-index.tar"
-    return tarball
+    let tarballs =
+            [ stackRoot </> "indices" </> "Hackage" </> "01-index.tar"
+            , stackRoot </> "indices" </> "Hackage" </> "00-index.tar"
+            ]
+        loop [] = error $ "tarballs not found: " ++ show tarballs
+        loop (x:xs) = do
+            exists <- doesFileExist x
+            if exists
+                then return x
+                else loop xs
+    loop tarballs
 
 -- | Get the Git commit of the all-cabal-hashes repo at its current state
 getAllCabalHashesCommit :: MonadIO m => m Text
