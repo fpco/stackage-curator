@@ -26,8 +26,8 @@ checkBuildPlan :: (MonadThrow m)
                => Bool -- ^ fail on missing Cabal package
                -> BuildPlan
                -> m ()
-checkBuildPlan failMissingCabal BuildPlan {..}
-    | null errs1 && null errs2 = return ()
+checkBuildPlan failMissingCabal bp@BuildPlan {..}
+    | null errs1 && null errs2 = checkConflictingModules bp
     | otherwise = throwM errs
   where
     allPackages = map (,mempty) (siCorePackages bpSystemInfo) ++
@@ -53,6 +53,33 @@ checkBuildPlan failMissingCabal BuildPlan {..}
     getMaint pn = do
         pp <- lookup pn bpPackages
         pcMaintainer $ ppConstraints pp
+
+checkConflictingModules :: MonadThrow m => BuildPlan -> m ()
+checkConflictingModules bp =
+    case mapMaybe isBad $ mapToList revmap of
+        [] -> return ()
+        xs -> terror $ unlines xs
+  where
+    cores = siCoreModules (bpSystemInfo bp)
+    others = (sdModules . ppDesc)
+         <$> M.filter (not . pcHide . ppConstraints) (bpPackages bp)
+    allMap = cores <> others
+
+    revmap :: Map Text (Set PackageName)
+    revmap = unionsWith (<>)
+           $ concatMap (\(k, vs) -> flip singletonMap (asSet $ singletonSet k) <$> toList vs)
+           $ mapToList allMap
+
+    isBad :: (Text, Set PackageName) -> Maybe Text
+    isBad (mn, pns)
+        | null pns = error "checkConflictingModules: invariant violated"
+        | length pns == 1 = Nothing
+        | otherwise = Just $ concat
+            [ "Module name "
+            , mn
+            , " appears in multiple packages: "
+            , unwords $ map display $ toList pns
+            ]
 
 -- | For a given package name and plan, check that its dependencies are:
 --

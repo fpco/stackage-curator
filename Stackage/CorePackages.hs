@@ -17,7 +17,7 @@ import           Stackage.Prelude
 import           System.Directory           (findExecutable)
 import           System.FilePath            (takeDirectory, takeFileName)
 
-addDeepDepends :: PackageName -> StateT (Map PackageName Version) IO ()
+addDeepDepends :: PackageName -> StateT (Map PackageName (Version, Set Text)) IO ()
 addDeepDepends name@(PackageName name') = do
     m <- get
     case lookup name m of
@@ -30,11 +30,13 @@ addDeepDepends name@(PackageName name') = do
             -- (if a bit hackier).
             put $ Map.insert name (error "Version prematurely forced") m
             let cp = proc "ghc-pkg" ["--no-user-package-conf", "describe", name']
-            version <- withCheckedProcess cp $ \ClosedStream src Inherited ->
+            info <- withCheckedProcess cp $ \ClosedStream src Inherited ->
                 src $$ decodeUtf8C =$ linesUnboundedC =$ getZipSink (
                        ZipSink (dependsConduit =$ dependsSink)
-                    *> ZipSink versionSink)
-            modify $ insertMap name version
+                    *> ((,)
+                            <$> ZipSink versionSink
+                            <*> ZipSink modulesSink))
+            modify $ insertMap name info
   where
     -- This sink finds the first line starting with "version: " and parses the
     -- value
@@ -47,6 +49,12 @@ addDeepDepends name@(PackageName name') = do
             case stripPrefix "version: " t of
                 Nothing -> loop
                 Just x -> simpleParse x
+
+    -- Grab the info from the exposed-modules bit
+    modulesSink = do
+        dropWhileC $ not . ("exposed-modules:" `isPrefixOf`)
+        dropC 1
+        fmap (setFromList . words . filter (/= ',') . toStrict) $ takeWhileC (" " `isPrefixOf`) .| sinkLazy
 
     -- Finds the beginning of the depends: block and parses the value. Lots of
     -- ugly text hacking here to try and be compatible with multiple versions
@@ -103,7 +111,7 @@ addDeepDepends name@(PackageName name') = do
 --
 -- Precondition: GHC global package database has only core packages, and GHC
 -- ships with just a single version of each packages.
-getCorePackages :: IO (Map PackageName Version)
+getCorePackages :: IO (Map PackageName (Version, Set Text))
 getCorePackages = flip execStateT mempty $ mapM_ (addDeepDepends . PackageName)
     [ "ghc"
     {-
