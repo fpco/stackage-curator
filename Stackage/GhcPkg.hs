@@ -28,10 +28,12 @@ setupPackageDatabase
     -> IO (Map PackageName Version) -- ^ packages remaining in the database after cleanup
 setupPackageDatabase mdb docDir log' toInstall onUnregister = do
     registered1 <- getRegisteredPackages flags
+    log' "Unregistering packages with version mismatch\n"
     forM_ registered1 $ \pi'@(PackageIdentifier name version) ->
         case lookup name toInstall of
             Just version' | version /= version' -> unregisterPackage log' onUnregister docDir flags pi'
             _ -> return ()
+    log' "\nUnregistering packages which are now broken in the database\n"
     broken <- getBrokenPackages flags
     forM_ broken $ unregisterPackage log' onUnregister docDir flags
     foldMap (\(PackageIdentifier name version) -> singletonMap name version)
