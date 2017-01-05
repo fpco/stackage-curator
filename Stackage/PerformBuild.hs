@@ -408,7 +408,7 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
         : "-global-package-db"
         : (case pbDatabase pb of
             Nothing -> rest
-            Just db -> ("-package-db=" ++ pack db) : rest) ++ setupPackages
+            Just db -> ("-package-db=" ++ pack db) : setupPackages ++ rest)
 
     setupPackages :: [Text]
     setupPackages =
