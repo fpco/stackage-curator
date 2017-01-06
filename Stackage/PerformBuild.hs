@@ -414,7 +414,7 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
     setupPackages =
         case sdSetupDeps $ ppDesc $ piPlan sbPackageInfo of
             Nothing -> []
-            Just pkgs -> "-hide-all-packages" : map (("--package=" ++) . display) (setToList pkgs)
+            Just pkgs -> "-hide-all-packages" : map (("-package=" ++) . display) (setToList pkgs)
 
     ghcPkgArgs :: [Text] -> [Text]
     ghcPkgArgs rest =
