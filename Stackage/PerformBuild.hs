@@ -997,7 +997,7 @@ calculatePackageMap pb registered prevRes allInfos =
 
     loop buildStates0 = do
         buildStates1 <- foldM step' buildStates0 (mapToList allInfos)
-        putStrLn $ concat
+        when False $ putStrLn $ concat
             [ "Debugging: added "
             , tshow $ length buildStates1 - length buildStates0
             , " keys, new keys == "
