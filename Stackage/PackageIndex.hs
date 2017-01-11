@@ -67,12 +67,12 @@ getPackageIndexPath = liftIO $ do
     loop tarballs
 
 -- | Get the Git commit of the all-cabal-hashes repo at its current state
-getAllCabalHashesCommit :: MonadIO m => m Text
+getAllCabalHashesCommit :: MonadIO m => m (Either SomeException Text)
 getAllCabalHashesCommit = liftIO $ do
     stackRoot <- getAppUserDataDirectory "stack"
     let dir = stackRoot </> "indices" </> "Hackage" </> "git-update" </> "all-cabal-hashes"
         cp = (proc "git" ["rev-list", "-n", "1", "current-hackage"]) { cwd = Just dir }
-    withCheckedProcessCleanup cp $ \ClosedStream out ClosedStream ->
+    tryAny $ withCheckedProcessCleanup cp $ \ClosedStream out ClosedStream ->
         out $$ takeWhileCE (/= 10) =$ decodeUtf8C =$ foldC
 
 -- | A cabal file with name and version parsed from the filepath, and the

@@ -30,12 +30,12 @@ import           Stackage.Prelude
 
 -- | Make a build plan given these package set and build constraints.
 newBuildPlan :: MonadIO m
-             => Text -- ^ all-cabal-hashes repo commit
+             => Either SomeException Text -- ^ all-cabal-hashes repo commit
              -> Map PackageName PackagePlan -- ^ latest allowed plans
              -> Map PackageName Version -- ^ latest package version available
              -> BuildConstraints
              -> m BuildPlan
-newBuildPlan allCabalHashesCommit packagesOrig packagesLatest bc@BuildConstraints {..} = liftIO $ do
+newBuildPlan eallCabalHashesCommit packagesOrig packagesLatest bc@BuildConstraints {..} = liftIO $ do
     let newReleased = mapMaybe checkReleased $ mapToList bcTellMeWhenItsReleased
         checkReleased (name, expectedVersion) =
             case lookup name packagesLatest of
@@ -78,7 +78,7 @@ newBuildPlan allCabalHashesCommit packagesOrig packagesLatest bc@BuildConstraint
         , bpPackages = packages
         , bpGithubUsers = bcGithubUsers
         , bpBuildToolOverrides = bcBuildToolOverrides
-        , bpAllCabalHashesCommit = Just allCabalHashesCommit
+        , bpAllCabalHashesCommit = either (const Nothing) Just eallCabalHashesCommit
         }
   where
     SystemInfo {..} = bcSystemInfo
