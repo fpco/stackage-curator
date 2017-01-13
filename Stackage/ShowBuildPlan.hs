@@ -15,6 +15,7 @@ module Stackage.ShowBuildPlan
     , setShellCommands
     , abstractCommands
     , simpleCommands
+    , ToInstall (..)
     , getBuildPlan
     , toSimpleText
     , toShellScript
