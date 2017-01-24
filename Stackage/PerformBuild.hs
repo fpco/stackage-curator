@@ -819,7 +819,8 @@ getPreviousResult w x y = withPRPath w x y $ \fp -> do
 -- | Remove all previous results to avoid a broken cache
 removePreviousResults :: PerformBuild -> ResultType -> PackageName -> IO ()
 removePreviousResults pb rt name =
-    runResourceT
+          whenM (doesDirectoryExist dir)
+        $ runResourceT
         $ sourceDirectory dir
        $$ filterC isOurPackage
        =$ filterMC (liftIO . doesFileExist)
