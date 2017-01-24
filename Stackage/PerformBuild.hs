@@ -772,12 +772,14 @@ getAllPreviousResults pb = do
   where
     go :: ResultType -> IO (Map PackageName (Version, PrevResult))
     go rt = do
-        allResults <-
+        exists <- doesDirectoryExist dir
+        allResults <- if exists then
                runResourceT
              $ sourceDirectory dir
             $$ filterMC (liftIO . doesFileExist)
             =$ mapMC (liftIO . toMap)
             =$ foldlC (unionWith union) mempty
+            else return mempty
         fmap concat $ mapM (uncurry removeDupes) $ mapToList allResults
       where
         dir = pbPrevResDir pb </> show rt
