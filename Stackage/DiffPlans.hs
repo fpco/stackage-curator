@@ -8,6 +8,7 @@ import           Data.Map (filterWithKey)
 import           Data.Text (justifyLeft)
 import           Data.Yaml (decodeFileEither)
 import           Network.HTTP.Client
+import           Network.HTTP.Simple (httpSink)
 import           Network.HTTP.Client.TLS (tlsManagerSettings)
 import           Stackage.Prelude
 
@@ -88,10 +89,8 @@ isMajor (Version old _) (Version new _) =
 getLTS :: String -> IO FilePath
 getLTS lts = do
     createDirectoryIfMissing True tmpDir
-    man <- newManager tlsManagerSettings
     req <- parseUrlThrow $ ltsRepo <> lts <> ".yaml"
-    res <- httpLbs req man
-    writeFile fName $ responseBody res
+    runResourceT $ httpSink req $ const $ sinkFile fName
     return fName
   where
     fName   = tmpDir <> lts <> ".yaml"

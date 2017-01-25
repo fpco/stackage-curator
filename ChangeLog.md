@@ -2,6 +2,7 @@
 
 * Add support for the `hide` field [yesodweb/wai#579](https://github.com/yesodweb/wai/issues/579)
 * `list-revdeps` command [#28](https://github.com/fpco/stackage-curator/issues/28)
+* Support for newer classy-prelude (fixes some char enc bugs)
 
 ## 0.14.4.1
 

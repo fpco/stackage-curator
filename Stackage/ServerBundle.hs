@@ -164,10 +164,10 @@ writeIndexStyle msnapid dir = do
          $$ filterMC (liftIO . doesDirectoryExist)
          =$ mapC takeFileName
          =$ sinkList
-    writeFile (dir </> "index.html") $ mkIndex
+    writeFile (dir </> "index.html") $ encodeUtf8 $ pack $ mkIndex
         (unpack <$> msnapid)
         dirs
-    writeFile (dir </> "style.css") styleCss
+    writeFile (dir </> "style.css") $ encodeUtf8 $ pack styleCss
     return dirs
 
 mkIndex :: Maybe String -> [String] -> String
