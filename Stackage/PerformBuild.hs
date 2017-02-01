@@ -641,7 +641,7 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
                                     ]
                         else do
                             outH <- getOutH
-                            hPut outH $ encodeUtf8 $ "Test suite not built: " ++ pack test
+                            hPut outH $ encodeUtf8 $ asText $ "Test suite not built: " ++ pack test
 
             savePreviousResult pb Test pident $ either (const False) (const True) eres
             case (eres, pcTests) of
