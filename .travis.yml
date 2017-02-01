@@ -1,5 +1,5 @@
 sudo: false
-language: c
+language: generic
 
 deploy:
   provider: s3
