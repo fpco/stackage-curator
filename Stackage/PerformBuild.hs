@@ -402,13 +402,17 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
 
         inner' getH `finally` cleanup
 
-    runghcArgs :: [Text] -> [Text]
-    runghcArgs rest =
-          "-clear-package-db"
-        : "-global-package-db"
-        : (case pbDatabase pb of
-            Nothing -> rest
-            Just db -> ("-package-db=" ++ pack db) : setupPackages ++ rest)
+    setup run args = do
+        run "ghc" $ runghcArgs ["Setup"]
+        run "./Setup" args
+      where
+        runghcArgs :: [Text] -> [Text]
+        runghcArgs rest =
+            "-clear-package-db"
+            : "-global-package-db"
+            : (case pbDatabase pb of
+                Nothing -> rest
+                Just db -> ("-package-db=" ++ pack db) : setupPackages ++ rest)
 
     setupPackages :: [Text]
     setupPackages =
@@ -489,7 +493,7 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
         let withConfiged inner' = withUnpacked $ \_gpd childDir -> do
                 let run a b = do when pbVerbose $ log' (unwords (a : b))
                                  runIn childDir getOutH a b
-                    cabal args = run "runghc" $ runghcArgs $ "Setup" : args
+                    cabal = setup run
 
                 unlessM (readIORef isConfiged) $ do
                     log' $ "Configuring " ++ namever
@@ -603,7 +607,7 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
                     && not pcSkipBuild
         when needTest $ withUnpacked $ \gpd childDir -> do
             let run = runIn childDir getOutH
-                cabal args = run "runghc" $ runghcArgs $ "Setup" : args
+                cabal = setup run
 
             log' $ "Test configure " ++ namever
             cabal $ "configure" : "--enable-tests" : configArgs
@@ -652,7 +656,7 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
                     && not pcSkipBuild
         when needTest $ withUnpacked $ \_gpd childDir -> do
             let run = runIn childDir getOutH
-                cabal args = run "runghc" $ runghcArgs $ "Setup" : args
+                cabal = setup run
 
             log' $ "Benchmark configure " ++ namever
             cabal $ "configure" : "--enable-benchmarks" : configArgs
