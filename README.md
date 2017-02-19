@@ -1,6 +1,7 @@
 ## stackage-curator
 
 [![Build Status](https://travis-ci.org/fpco/stackage-curator.svg?branch=master)](https://travis-ci.org/fpco/stackage-curator)
+[![Hackage](http://img.shields.io/hackage/v/stackage-curator.png)](http://hackage.haskell.org/package/stackage-curator)
 
 This repository contains the code for curating Stackage package sets and
 building reusable package databases. It was originally simply called the
