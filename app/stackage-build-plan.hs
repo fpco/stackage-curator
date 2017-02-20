@@ -20,7 +20,7 @@ main = do
         "Calculate and print (in different formats) Stackage build plans"
         options
         empty
-    tis <- getBuildPlan set $ map (mkPackageName . T.pack) packages
+    tis <- getPackagesToInstall set $ map (mkPackageName . T.pack) packages
     TLIO.putStr $ render set tis
   where
     options = (,,)
