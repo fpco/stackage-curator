@@ -1,3 +1,7 @@
+## Unreleased
+
+* Ignore packages with invalid flag definitions [fpco/stackage#2468](https://github.com/fpco/stackage/issues/2468)
+
 ## 0.14.5
 
 * Add support for the `hide` field [yesodweb/wai#579](https://github.com/yesodweb/wai/issues/579)

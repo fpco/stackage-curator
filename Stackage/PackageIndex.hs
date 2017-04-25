@@ -300,7 +300,7 @@ instance Exception CabalParseException
 -- given criterion.
 getLatestDescriptions :: MonadIO m
                       => (PackageName -> Version -> Bool)
-                      -> (SimplifiedPackageDescription -> IO desc)
+                      -> (SimplifiedPackageDescription -> Either SomeException desc)
                       -> m (Map PackageName desc, Map PackageName Version)
 getLatestDescriptions f parseDesc = liftIO $ do
     root <- fmap (</> "curator") $ getAppUserDataDirectory "stackage"
@@ -320,8 +320,10 @@ getLatestDescriptions f parseDesc = liftIO $ do
         (\m ucf ->
             if lookup (ucfName ucf) (asMap mvers) == Just (ucfVersion ucf)
                 then do
-                    desc <- liftIO $ ucfParse root ucf >>= parseDesc
-                    return $! insertMap (ucfName ucf) desc m
+                    edesc <- liftIO $ parseDesc <$> ucfParse root ucf
+                    case edesc of
+                        Left e -> print e $> m
+                        Right desc -> return $! insertMap (ucfName ucf) desc m
                 else return m)
     return (plans, latests)
   where
