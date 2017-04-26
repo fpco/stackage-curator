@@ -124,6 +124,8 @@ data BuildPlan = BuildPlan
     , bpGithubUsers :: Map Text (Set Text)
     , bpBuildToolOverrides :: Map Text (Set Text)
     , bpAllCabalHashesCommit :: Maybe Text
+    , bpNoRevisions :: !(Set PackageName)
+    -- ^ Packages where we ignore Hackage revisions
     }
     deriving (Show, Eq)
 
@@ -135,6 +137,7 @@ instance ToJSON BuildPlan where
         , "packages" .= Map.mapKeysWith const unPackageName bpPackages
         , "github-users" .= bpGithubUsers
         , "build-tool-overrides" .= bpBuildToolOverrides
+        , "no-revisions" .= Set.map unPackageName bpNoRevisions
         ]
       where
         goTool (k, v) = object
@@ -149,6 +152,7 @@ instance FromJSON BuildPlan where
         bpGithubUsers <- o .:? "github-users" .!= mempty
         bpBuildToolOverrides <- o .:? "build-tool-overrides" .!= mempty
         bpAllCabalHashesCommit <- o .:? "all-cabal-hashes-commit"
+        bpNoRevisions <- Set.map PackageName <$> o .:? "no-revisions" .!= mempty
         return BuildPlan {..}
       where
         goTool = withObject "Tool" $ \o -> (,)

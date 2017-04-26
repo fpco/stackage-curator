@@ -1,6 +1,7 @@
 ## Unreleased
 
 * Ignore packages with invalid flag definitions [fpco/stackage#2468](https://github.com/fpco/stackage/issues/2468)
+* Support a `no-revisions` field to ignore Hackage revisions (experimental) [fpco/stackage#2469](https://github.com/fpco/stackage/issues/2469)
 
 ## 0.14.5
 

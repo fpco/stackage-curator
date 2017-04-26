@@ -299,10 +299,12 @@ instance Exception CabalParseException
 -- | Get all of the latest descriptions for name/version pairs matching the
 -- given criterion.
 getLatestDescriptions :: MonadIO m
-                      => (PackageName -> Version -> Bool)
+                      => Set PackageName
+                      -- ^ packages where we ignore the Hackage revisions
+                      -> (PackageName -> Version -> Bool)
                       -> (SimplifiedPackageDescription -> Either SomeException desc)
                       -> m (Map PackageName desc, Map PackageName Version)
-getLatestDescriptions f parseDesc = liftIO $ do
+getLatestDescriptions noRevisions f parseDesc = liftIO $ do
     root <- fmap (</> "curator") $ getAppUserDataDirectory "stackage"
 
     -- Parse twice to avoid keeping stuff in memory: once to determine which
@@ -318,7 +320,8 @@ getLatestDescriptions f parseDesc = liftIO $ do
     liftIO $ putStrLn "Parsing package descriptions"
     plans <- runResourceT $ sourcePackageIndex $$ flip foldMC mempty
         (\m ucf ->
-            if lookup (ucfName ucf) (asMap mvers) == Just (ucfVersion ucf)
+            if lookup (ucfName ucf) (asMap mvers) == Just (ucfVersion ucf) &&
+               (ucfName ucf `notMember` noRevisions || ucfName ucf `notMember` m)
                 then do
                     edesc <- liftIO $ parseDesc <$> ucfParse root ucf
                     case edesc of

@@ -31,6 +31,7 @@ updateBuildConstraints BuildPlan {..} =
     bcGithubUsers = bpGithubUsers
     bcBuildToolOverrides = bpBuildToolOverrides
     bcTellMeWhenItsReleased = mempty -- we don't care when doing an update
+    bcNoRevisions = bpNoRevisions
 
     bcPackageConstraints name = PackageConstraints
         { pcVersionRange = addBumpRange (maybe anyVersion pcVersionRange moldPC)

@@ -79,6 +79,7 @@ newBuildPlan eallCabalHashesCommit packagesOrig packagesLatest bc@BuildConstrain
         , bpGithubUsers = bcGithubUsers
         , bpBuildToolOverrides = bcBuildToolOverrides
         , bpAllCabalHashesCommit = either (const Nothing) Just eallCabalHashesCommit
+        , bpNoRevisions = bcNoRevisions
         }
   where
     SystemInfo {..} = bcSystemInfo
@@ -194,5 +195,6 @@ mkPackagePlan bc spd = do
 getLatestAllowedPlans :: MonadIO m => BuildConstraints -> m (Map PackageName PackagePlan, Map PackageName Version)
 getLatestAllowedPlans bc =
     getLatestDescriptions
+        (bcNoRevisions bc)
         (isAllowed bc)
         (mkPackagePlan bc)

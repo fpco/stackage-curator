@@ -49,6 +49,9 @@ data BuildConstraints = BuildConstraints
     -- cabal executable
 
     , bcTellMeWhenItsReleased :: Map PackageName Version
+
+    , bcNoRevisions :: !(Set PackageName)
+    -- ^ see 'cfNoRevisions'
     }
 
 -- | Modify the version bounds with the given Dependencies
@@ -128,6 +131,8 @@ data ConstraintFile = ConstraintFile
     , cfTellMeWhenItsReleased   :: Map PackageName Version
     , cfHide                    :: Set PackageName
     -- ^ Packages which should be hidden after registering
+    , cfNoRevisions             :: !(Set PackageName)
+    -- ^ Packages where we should ignore any Hackage revisions
     }
 
 instance FromJSON ConstraintFile where
@@ -152,6 +157,7 @@ instance FromJSON ConstraintFile where
         cfTellMeWhenItsReleased <- (fmap mconcat $ o .: "tell-me-when-its-released" >>= mapM toNameVerMap)
                                <?> Key "tell-me-when-its-released"
         cfHide <- Set.map PackageName <$> o .:? "hide" .!= mempty
+        cfNoRevisions <- Set.map PackageName <$> o .:? "no-revisions" .!= mempty
         return ConstraintFile {..}
       where
         goFlagMap = Map.mapKeysWith const FlagName
@@ -231,3 +237,4 @@ toBC ConstraintFile {..} = do
     bcGithubUsers = cfGithubUsers
     bcBuildToolOverrides = cfBuildToolOverrides
     bcTellMeWhenItsReleased = cfTellMeWhenItsReleased
+    bcNoRevisions = cfNoRevisions
