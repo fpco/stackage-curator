@@ -328,6 +328,8 @@ data SystemInfo = SystemInfo
     , siOS              :: OS
     , siArch            :: Arch
     , siCorePackages    :: Map PackageName Version
+    , siCoreModules     :: Map PackageName (Set Text)
+    -- ^ Should be part of siCorePackages but kept separate for backwards compatibility
     , siCoreExecutables :: Set ExeName
     }
     deriving (Show, Eq, Ord)
@@ -337,6 +339,7 @@ instance ToJSON SystemInfo where
         , "os" .= display siOS
         , "arch" .= display siArch
         , "core-packages" .= Map.mapKeysWith const unPackageName (fmap display siCorePackages)
+        , "core-modules" .= Map.mapKeysWith const unPackageName siCoreModules
         , "core-executables" .= siCoreExecutables
         ]
 instance FromJSON SystemInfo where
@@ -346,6 +349,7 @@ instance FromJSON SystemInfo where
         siOS <- helper "os"
         siArch <- helper "arch"
         siCorePackages <- (o .: "core-packages") >>= goPackages
+        siCoreModules <- Map.mapKeysWith const mkPackageName <$> (o .: "core-modules")
         siCoreExecutables <- o .: "core-executables"
         return SystemInfo {..}
       where

@@ -104,7 +104,7 @@ loadBuildConstraints bcs man = do
 
 getSystemInfo :: IO SystemInfo
 getSystemInfo = do
-    siCorePackages <- getCorePackages
+    (siCorePackages, siCoreModules) <- (fmap fst &&& fmap snd) <$> getCorePackages
     siCoreExecutables <- getCoreExecutables
     siGhcVersion <- getGhcVersion
     return SystemInfo {..}
