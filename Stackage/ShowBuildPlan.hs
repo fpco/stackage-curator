@@ -17,6 +17,7 @@ module Stackage.ShowBuildPlan
     , simpleCommands
     , ToInstall (..)
     , getBuildPlan
+    , getPackagesToInstall
     , toSimpleText
     , toShellScript
     , mkPackageName
@@ -314,12 +315,16 @@ instance A.ToJSON ToInstall where
         , "is-core" .= tiIsCore ti
         ]
 
-getBuildPlan :: Settings -> [PackageName] -> IO [ToInstall]
-getBuildPlan _ [] = return []
-getBuildPlan set packages = do
+getBuildPlan :: Settings -> IO BuildPlan
+getBuildPlan set = do
     man <- _getManager set
     fp <- yamlFP man $ _snapshot set
-    bp <- decodeFileEither fp >>= either throwM return
+    decodeFileEither fp >>= either throwM return
+
+getPackagesToInstall :: Settings -> [PackageName] -> IO [ToInstall]
+getPackagesToInstall _ [] = return []
+getPackagesToInstall set packages = do
+    bp <- getBuildPlan set
     (_, front) <- execStateT (getDeps bp (_fullDeps set) packages) (Set.empty, id)
     return $ front []
 
