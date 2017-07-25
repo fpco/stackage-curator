@@ -23,4 +23,4 @@ listRevDeps planFile deep pkg0 = do
               Nothing -> return ()
               Just PackagePlan {..} -> mapM_ go ppUsers
     let pkgs = execState (go pkg0) (asSet mempty)
-    mapM_ (putStrLn . unPackageName) pkgs
+    mapM_ (putStrLn . pack . unPackageName) pkgs

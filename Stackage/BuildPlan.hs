@@ -97,7 +97,7 @@ makeToolMap overrides =
 
     overrides' :: Map ExeName (Set PackageName)
     overrides' = Map.mapKeysWith (++) ExeName
-               $ fmap (Set.map mkPackageName) overrides
+               $ fmap (Set.map (mkPackageName . unpack)) overrides
 
 topologicalSortTools :: MonadThrow m
                      => Map ExeName (Set PackageName)

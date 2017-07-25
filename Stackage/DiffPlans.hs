@@ -1,5 +1,5 @@
 {-# LANGUAGE FlexibleContexts, GADTs, NoImplicitPrelude, OverloadedStrings,
-             ScopedTypeVariables #-}
+             ScopedTypeVariables, ViewPatterns #-}
 module Stackage.DiffPlans
     ( diffPlans
     ) where
@@ -76,7 +76,7 @@ diffPlans oldFP newFP diffsOnly useColor False asHtml = do
                   (singletonMap name $ (display x, Just $ display y))
 
 isMajor :: Version -> Version -> Bool
-isMajor (Version old _) (Version new _) =
+isMajor (versionNumbers -> old) (versionNumbers -> new) =
     toPair old /= toPair new
   where
     toPair []      = (0, 0)

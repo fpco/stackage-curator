@@ -66,7 +66,7 @@ serverBundle time title slug bp@BuildPlan {..} = GZip.compress $ Tar.write
     hackage = builderToLazy $ foldMap goPair $ mapToList packageMap
 
     -- need to remove some packages that don't exist on Hackage
-    packageMap = foldr deleteMap (bpAllPackages bp) $ map PackageName
+    packageMap = foldr deleteMap (bpAllPackages bp) $ map mkPackageName
         [ "bin-package-db"
         , "ghc"
         , "rts"
@@ -80,7 +80,7 @@ serverBundle time title slug bp@BuildPlan {..} = GZip.compress $ Tar.write
 
     corePackagesList =
         builderToLazy $ toBuilder $ unlines $
-            map (\(PackageName name) -> name)
+            map unPackageName
                 (M.keys $ siCorePackages bpSystemInfo)
 
 docsListing :: BuildPlan

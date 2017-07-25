@@ -29,8 +29,11 @@ import           Data.Conduit.Lazy                     (MonadActive,
                                                         lazyConsume)
 import qualified Data.Text                             as T
 import           Distribution.Compiler                 (CompilerFlavor)
+import           Distribution.Types.CondTree           (CondBranch (..))
+import           Distribution.Types.UnqualComponentName (unUnqualComponentName)
+import           Distribution.Types.ExeDependency
 import           Distribution.Version                  (VersionRange (..))
-import           Distribution.Package                  (Dependency)
+import           Distribution.Package                  (Dependency (..))
 import           Distribution.PackageDescription
 import           Distribution.PackageDescription.Parse (ParseResult (..),
                                                         parsePackageDescription)
@@ -46,7 +49,7 @@ import           Crypto.Hash                 (MD5 (..), SHA1 (..), SHA256 (..),
                                               SHA512 (..), Skein512_512 (..), hashlazy,
                                               Digest, HashAlgorithm, digestToHexByteString)
 import qualified Crypto.Hash.SHA1 as SHA1
-import           Data.Store                            (Store)
+import           Data.Store                            (Store (..), Size (..))
 import qualified Data.Store                            as Store
 import qualified Data.Store.TypeHash                   as Store
 
@@ -87,7 +90,7 @@ data UnparsedCabalFile = UnparsedCabalFile
     }
 
 data SimplifiedComponentInfo = SimplifiedComponentInfo
-    { sciBuildTools :: [Dependency]
+    { sciBuildTools :: [(ExeName, VersionRange)]
     , sciModules :: Set Text
     }
     deriving Generic
@@ -114,16 +117,29 @@ deriving instance Generic Version
 
 instance Store SimplifiedPackageDescription
 instance Store a => Store (CondTree ConfVar [Dependency] a)
+instance Store a => Store (CondBranch ConfVar [Dependency] a)
 instance Store Dependency
 instance Store v => Store (Condition v)
 instance Store ConfVar
 instance Store Arch
 instance Store OS
 instance Store CompilerFlavor
-instance Store PackageName
+instance Store PackageName where
+  size =
+    case size of
+      VarSize f -> VarSize (f . unPackageName)
+      ConstSize _ -> error "impossible"
+  poke = poke . unPackageName
+  peek = mkPackageName <$> peek
 instance Store Version
 instance Store VersionRange
-instance Store FlagName
+instance Store FlagName where
+  size =
+    case size of
+      VarSize f -> VarSize (f . unFlagName)
+      ConstSize _ -> error "impossible"
+  poke = poke . unFlagName
+  peek = mkFlagName <$> peek
 -- END orphans
 
 Store.mkManyHasTypeHash
@@ -157,9 +173,9 @@ gpdToSpd raw gpd = SimplifiedPackageDescription
                     ]
         }
     , spdCondLibrary = mapCondTree simpleLib <$> condLibrary gpd
-    , spdCondExecutables = map (fmap $ mapCondTree simpleExe) $ condExecutables gpd
-    , spdCondTestSuites = map (fmap $ mapCondTree simpleTest) $ condTestSuites gpd
-    , spdCondBenchmarks = map (fmap $ mapCondTree simpleBench) $ condBenchmarks gpd
+    , spdCondExecutables = map unqual $ map (fmap $ mapCondTree simpleExe) $ condExecutables gpd
+    , spdCondTestSuites = map unqual $ map (fmap $ mapCondTree simpleTest) $ condTestSuites gpd
+    , spdCondBenchmarks = map unqual $ map (fmap $ mapCondTree simpleBench) $ condBenchmarks gpd
     , spdSetupDeps = fmap setupDepends $ setupBuildInfo $ packageDescription gpd
     , spdPackageFlags =
         let getFlag MkFlag {..} = (flagName, flagDefault)
@@ -190,20 +206,22 @@ gpdToSpd raw gpd = SimplifiedPackageDescription
   where
     PackageIdentifier name version = package $ packageDescription gpd
 
+    unqual = first unUnqualComponentName
+
     simpleLib = helper getModules libBuildInfo
     simpleExe = helper noModules buildInfo
     simpleTest = helper noModules testBuildInfo
     simpleBench = helper noModules benchmarkBuildInfo
 
     helper getModules' getBI x = SimplifiedComponentInfo
-        { sciBuildTools = buildTools $ getBI x
+        { sciBuildTools = map
+          (\(ExeDependency _ name range) -> (ExeName $ pack $ unUnqualComponentName name, range))
+          (buildToolDepends $ getBI x)
         , sciModules = getModules' x
         }
 
     noModules = const mempty
     getModules = setFromList . map display . exposedModules
-
-deriving instance Functor (CondTree v c)
 
 mapCondTree :: (a -> b) -> CondTree v c a -> CondTree v c b
 mapCondTree = fmap

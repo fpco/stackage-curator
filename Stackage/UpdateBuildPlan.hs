@@ -57,7 +57,7 @@ updateBuildConstraints BuildPlan {..} =
 
     bumpRange version = intersectVersionRanges
         (orLaterVersion version)
-        (earlierVersion $ bumpVersion version)
-    bumpVersion (Version (x:y:_) _) = Version [x, y + 1] []
-    bumpVersion (Version [x] _) = Version [x, 1] []
-    bumpVersion (Version [] _) = assert False $ Version [1, 0] []
+        (earlierVersion $ bumpVersion $ versionNumbers version)
+    bumpVersion (x:y:_) = mkVersion [x, y + 1]
+    bumpVersion [x] = mkVersion [x, 1]
+    bumpVersion [] = assert False $ mkVersion [1, 0]

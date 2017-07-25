@@ -156,13 +156,13 @@ instance FromJSON ConstraintFile where
         cfTreatAsNonCore <- getPackages o "treat-as-non-core" <|> return mempty
         cfTellMeWhenItsReleased <- (fmap mconcat $ o .: "tell-me-when-its-released" >>= mapM toNameVerMap)
                                <?> Key "tell-me-when-its-released"
-        cfHide <- Set.map PackageName <$> o .:? "hide" .!= mempty
-        cfNoRevisions <- Set.map PackageName <$> o .:? "no-revisions" .!= mempty
+        cfHide <- Set.map mkPackageName <$> o .:? "hide" .!= mempty
+        cfNoRevisions <- Set.map mkPackageName <$> o .:? "no-revisions" .!= mempty
         return ConstraintFile {..}
       where
-        goFlagMap = Map.mapKeysWith const FlagName
-        goPackageMap = Map.mapKeysWith const PackageName
-        getPackages o name = (setFromList . map PackageName) <$> o .: name
+        goFlagMap = Map.mapKeysWith const mkFlagName
+        goPackageMap = Map.mapKeysWith const mkPackageName
+        getPackages o name = (setFromList . map mkPackageName) <$> o .: name
 
         toDep :: Monad m => Text -> m Dependency
         toDep = either (fail . show) return . simpleParse
@@ -172,7 +172,7 @@ instance FromJSON ConstraintFile where
                      . simpleParse
 
         parseMajorVersion t =
-            case versionBranch <$> simpleParse t of
+            case versionNumbers <$> simpleParse t of
                 Just [x, y] -> return (x, y)
                 _ -> fail $ "Invalid GHC major version: " ++ unpack t
 
@@ -195,7 +195,7 @@ toBC :: ConstraintFile -> IO BuildConstraints
 toBC ConstraintFile {..} = do
     bcSystemInfo <- removeFromCore cfTreatAsNonCore <$> getSystemInfo
     forM_ cfGhcMajorVersion $ \(major, minor) ->
-        case versionBranch $ siGhcVersion bcSystemInfo of
+        case versionNumbers $ siGhcVersion bcSystemInfo of
             major':minor':_ | major == major' && minor == minor' -> return ()
             _ -> throwIO $ MismatchedGhcVersion (siGhcVersion bcSystemInfo) major minor
     return BuildConstraints {..}

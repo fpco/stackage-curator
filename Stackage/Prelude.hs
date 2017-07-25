@@ -11,11 +11,11 @@ module Stackage.Prelude
 import           ClassyPrelude.Conduit           as X
 import           Data.Conduit.Process            as X
 import qualified Data.Map                        as Map
-import           Distribution.Package            as X (PackageIdentifier (..), PackageName (PackageName))
+import           Distribution.Package            as X (PackageIdentifier (..))
 import           Distribution.PackageDescription as X (FlagName (..), GenericPackageDescription)
-import           Distribution.Version            as X (Version (..),
-                                                       VersionRange)
-import           Distribution.Version            as X (withinRange)
+import           Distribution.Version            as X (Version, VersionRange)
+import           Distribution.Version            as X (withinRange, versionNumbers, mkVersion)
+import           Distribution.Types.PackageName  as X (PackageName, mkPackageName, unPackageName)
 import qualified Distribution.Version            as C
 import           Filesystem                      (createTree)
 import           Filesystem.Path                 (parent)

@@ -34,7 +34,7 @@ checkBuildPlan failMissingCabal BuildPlan {..}
                   map (ppVersion &&& M.keys . M.filter libAndExe . sdPackages . ppDesc) bpPackages
     errs@(BadBuildPlan errs1 errs2) = execWriter $ do
         mapM_ (checkDeps getMaint allPackages) $ mapToList bpPackages
-        let cabalName = PackageName "Cabal"
+        let cabalName = mkPackageName "Cabal"
         case lookup cabalName bpPackages of
             Nothing
                 | failMissingCabal -> tell

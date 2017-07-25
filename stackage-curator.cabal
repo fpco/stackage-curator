@@ -41,7 +41,7 @@ library
                        Stackage.Types
   build-depends:       base >= 4 && < 5
                      , containers
-                     , Cabal >= 1.24
+                     , Cabal >= 2.0 && < 2.1
                      , tar >= 0.3
                      , zlib
                      , bytestring

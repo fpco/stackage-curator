@@ -23,6 +23,7 @@ import           Data.Semigroup                  (Option (..), Max (..))
 import           Distribution.Compiler           (CompilerFlavor)
 import           Distribution.Package            (Dependency (..))
 import           Distribution.PackageDescription
+import           Distribution.Types.CondTree     (CondBranch (..))
 import           Distribution.System             (Arch, OS)
 import           Stackage.PackageIndex
 import           Stackage.Prelude
@@ -72,17 +73,17 @@ tellTree cc component =
                     , diRange = simplifyVersionRange y
                     }
             , sdTools = unionsWith (<>) $ flip map (sciBuildTools dat)
-                $ \(Dependency name range) -> singletonMap
+                $ \(name, range) -> singletonMap
                     -- In practice, cabal files refer to the exe name, not the
                     -- package name.
-                    (ExeName $ unPackageName name)
+                    name
                     DepInfo
                         { diComponents = singletonSet component
                         , diRange = simplifyVersionRange range
                         }
             , sdModules = sciModules dat
             }
-        forM_ comps $ \(cond, ontrue, onfalse) -> do
+        forM_ comps $ \(CondBranch cond ontrue onfalse) -> do
             b <- checkCond cc cond
             if b
                 then loop ontrue

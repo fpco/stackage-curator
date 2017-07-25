@@ -96,12 +96,12 @@ makePackageSet ps _ =
     M.fromList $
     map
         (\(name,ver,deps) ->
-              ( PackageName name
+              ( mkPackageName name
               , dummyPackage ver $
                 M.fromList $
                 map
                     (\(dname,dver) ->
-                          ( PackageName dname
+                          ( mkPackageName dname
                           , DepInfo {diComponents = S.fromList
                                              [CompLibrary]
                                     ,diRange = dver}))
@@ -110,7 +110,7 @@ makePackageSet ps _ =
     where
         dummyPackage v deps =
             PackagePlan
-                {ppVersion = Version v []
+                {ppVersion = mkVersion v
                 ,ppCabalFileInfo = Nothing
                 ,ppSourceUrl = Nothing
                 ,ppGithubPings = mempty
@@ -138,7 +138,7 @@ makePackageSet ps _ =
 
 -- | This exact version is required.
 thisV :: [Int] -> VersionRange
-thisV ver = thisVersion (Version ver [])
+thisV ver = thisVersion (mkVersion ver)
 
 -- | Accept any version.
 anyV :: VersionRange

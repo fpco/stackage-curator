@@ -11,7 +11,7 @@ spec = do
     it "contains known core packages" $ do
         m <- getCorePackages
         forM_ (words "ghc containers base") $ \p ->
-            m `shouldSatisfy` (member (PackageName p))
+            m `shouldSatisfy` (member (mkPackageName p))
     it "getCoreExecutables includes known executables" $ do
         s <- getCoreExecutables
         s `shouldSatisfy` member "ghc"

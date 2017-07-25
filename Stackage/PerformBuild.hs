@@ -6,6 +6,7 @@
 {-# LANGUAGE OverloadedStrings  #-}
 {-# LANGUAGE RecordWildCards    #-}
 {-# LANGUAGE FlexibleContexts   #-}
+{-# LANGUAGE ViewPatterns       #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Stackage.PerformBuild
     ( performBuild
@@ -26,6 +27,7 @@ import           Distribution.PackageDescription (buildType, packageDescription,
                                                  condTestSuites)
 import           Distribution.Package        (Dependency (..))
 import           Distribution.PackageDescription.PrettyPrint (writeGenericPackageDescription)
+import           Distribution.Types.UnqualComponentName
 import           Distribution.Version        (anyVersion)
 import           Filesystem                  (canonicalizePath, createTree,
                                               getWorkingDirectory,
@@ -56,7 +58,7 @@ instance Show BuildException where
     show (BuildException m warnings) =
         unlines $ "" : "" : "" : map go (mapToList m) ++ map unpack warnings
       where
-        go (PackageName name, bf) = concat
+        go (unPackageName -> name, bf) = concat
             [ name
             , ": "
             , take 500 $ show bf
@@ -146,7 +148,7 @@ waitForDeps toolMap packageMap activeComps bp pi action = do
     -- Since we build every package using the Cabal library, it's an implicit
     -- dependency of everything
     addCabal :: Set PackageName -> Set PackageName
-    addCabal = insertSet (PackageName "Cabal")
+    addCabal = insertSet (mkPackageName "Cabal")
 
 withCounter :: TVar Int -> IO a -> IO a
 withCounter counter = bracket_
@@ -304,7 +306,7 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
     testComps = insertSet CompTestSuite libComps
     benchComps = insertSet CompBenchmark libComps
 
-    thisIsCabal = pname == PackageName "Cabal" -- cue Sparta joke
+    thisIsCabal = pname == mkPackageName "Cabal" -- cue Sparta joke
 
     inner
       | thisIsCabal && pbNoRebuildCabal =
@@ -449,7 +451,7 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
         tell' x = tell (x:)
 
     flags :: Text
-    flags = unwords $ map go $ mapToList pcFlagOverrides
+    flags = pack $ unwords $ map go $ mapToList pcFlagOverrides
       where
         go (name', isOn) = concat
             [ if isOn then "" else "-"
@@ -616,7 +618,7 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
                 log' $ "Test build " ++ namever
                 cabal ["build"]
 
-                let tests = map fst $ condTestSuites gpd
+                let tests = map (unUnqualComponentName . fst) $ condTestSuites gpd
                 forM_ tests $ \test -> do
                     log' $ concat
                         [ "Test run "
@@ -862,7 +864,7 @@ getHaddockFiles pb =
     go dir =
         case simpleParse nameVerText of
             Nothing -> return mempty
-            Just (PackageIdentifier (PackageName name) _) -> do
+            Just (PackageIdentifier (unPackageName -> name) _) -> do
                 let fp = dir </> name <.> "haddock"
                 exists <- doesFileExist fp
                 return $ if exists

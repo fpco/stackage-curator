@@ -45,7 +45,7 @@ import qualified Data.Text                   as T
 import           Data.Text.Read              (decimal)
 import           Data.Time                   (Day)
 import           Data.Typeable               (Typeable)
-import           Data.Version                (Version)
+import           Distribution.Version        (Version)
 import           Data.Yaml                   (decodeFileEither)
 import           Distribution.Package        (PackageName)
 import           Network.HTTP.Client         (Manager, brRead, httpLbs,
@@ -356,7 +356,7 @@ getDeps bp fullDeps =
         forM_ (Map.toList $ sdPackages $ ppDesc pp) $ \(name', depInfo) ->
             when (includeDep depInfo) (goName name')
         addToList name (ppVersion pp)
-            (Map.mapKeysWith const unFlagName
+            (Map.mapKeysWith const (T.pack . unFlagName)
              $ pcFlagOverrides $ ppConstraints pp)
             False
 
