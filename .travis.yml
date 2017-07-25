@@ -28,6 +28,7 @@ before_install:
 
 script:
 - mkdir -p to-travis
+- stack --version
 - stack --no-terminal test --install-ghc --copy-bins --local-bin-path to-travis
 - bzip2 to-travis/stackage-curator
 
