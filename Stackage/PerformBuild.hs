@@ -329,6 +329,13 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
         , "-"
         , version
         ]
+    nameverrevhash = concat
+        [ namever
+        , fromMaybe (assert False "") $ do
+            cfi <- ppCabalFileInfo $ piPlan sbPackageInfo
+            hash <- lookup "GitSHA1" $ cfiHashes cfi
+            Just $ "@gitsha1:" ++ hash
+        ]
 
     quote :: Text -> Text
     quote s
@@ -479,9 +486,9 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
                                         ]
                                     return $ sbBuildDir </> "cabal" </> "Cabal"
                                 else do
-                                    log' $ "Unpacking " ++ namever
+                                    log' $ "Unpacking " ++ nameverrevhash
                                     case ppSourceUrl $ piPlan sbPackageInfo of
-                                        Nothing -> runParent getOutH "stack" ["unpack", namever]
+                                        Nothing -> runParent getOutH "stack" ["unpack", nameverrevhash]
                                         Just url -> unpackFromURL sbBuildDir url
                                     return $ sbBuildDir </> unpack namever
 
