@@ -16,8 +16,7 @@ import Stackage.PackageIndex
 import qualified Codec.Archive.Tar as Tar
 import Data.Conduit.Lazy (lazyConsume)
 import Codec.Compression.GZip (compress)
-import           Network.AWS                   (Credentials (Discover),
-                                                Region (NorthVirginia), newEnv)
+import           Network.AWS                   (Credentials (Discover), newEnv)
 import Stackage.Curator.UploadDocs (upload)
 
 uploadIndex

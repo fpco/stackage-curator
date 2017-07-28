@@ -13,7 +13,7 @@ listRevDeps :: FilePath
             -> Bool -- ^ deep revdeps
             -> PackageName -- ^ package to check
             -> IO ()
-listRevDeps planFile deep pkg0 = do
+listRevDeps planFile _FIXMEdeep pkg0 = do
     BuildPlan {..} <- decodeFileEither planFile >>= either throwIO return
     let go pkg = do
           visited <- get

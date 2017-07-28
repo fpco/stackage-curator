@@ -215,7 +215,7 @@ gpdToSpd raw gpd = SimplifiedPackageDescription
 
     helper getModules' getBI x = SimplifiedComponentInfo
         { sciBuildTools = map
-          (\(ExeDependency _ name range) -> (ExeName $ pack $ unUnqualComponentName name, range))
+          (\(ExeDependency _ name' range) -> (ExeName $ pack $ unUnqualComponentName name', range))
           (buildToolDepends $ getBI x)
         , sciModules = getModules' x
         }

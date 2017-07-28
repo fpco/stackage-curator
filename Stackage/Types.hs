@@ -56,7 +56,7 @@ import           Data.Vector                     (Vector)
 import           Distribution.Types.PackageName  (PackageName)
 import qualified Distribution.Types.PackageName  as C
 import qualified Distribution.PackageDescription as C
-import           Distribution.PackageDescription (FlagName (..))
+import           Distribution.PackageDescription (FlagName)
 import           Distribution.System             (Arch, OS)
 import qualified Distribution.Text               as DT
 import           Distribution.Version            (Version, VersionRange)

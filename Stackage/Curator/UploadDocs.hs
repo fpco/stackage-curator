@@ -30,7 +30,7 @@ import           Distribution.Package          (PackageIdentifier (..))
 import qualified Filesystem                    as F
 import qualified Filesystem.Path.CurrentOS     as F
 import           Network.AWS                   (Credentials (Discover), Env,
-                                                Region (NorthVirginia), newEnv,
+                                                newEnv,
                                                 send, toBody, runAWS)
 import           Network.AWS.S3                (ObjectCannedACL (OPublicRead),
                                                 poACL, poCacheControl,

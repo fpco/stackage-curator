@@ -9,7 +9,6 @@ import           Data.Text (justifyLeft)
 import           Data.Yaml (decodeFileEither)
 import           Network.HTTP.Client
 import           Network.HTTP.Simple (httpSink)
-import           Network.HTTP.Client.TLS (tlsManagerSettings)
 import           Stackage.Prelude
 
 import           Data.Maybe

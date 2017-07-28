@@ -405,7 +405,7 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
         inner' getH `finally` cleanup
 
     setup run args = do
-        run "ghc" $ runghcArgs ["Setup"]
+        _ <- run "ghc" $ runghcArgs ["Setup"]
         run "./Setup" args
       where
         runghcArgs :: [Text] -> [Text]
@@ -993,8 +993,8 @@ calculatePackageMap pb registered prevRes allInfos =
             -- If we have a previous successful build result which
             -- matches our version, then we'll need to check
             -- dependencies to know what to do
-            | Just (prevVer, prevRes) <- prevRes name Build
-            , prevVer == version && prevRes == PRSuccess = mempty
+            | Just (prevVer, prevRes') <- prevRes name Build
+            , prevVer == version && prevRes' == PRSuccess = mempty
 
             -- Something in the previous step failed, so do a full build
             | otherwise = singletonMap name BSFullBuild

@@ -12,7 +12,7 @@ import           ClassyPrelude.Conduit           as X
 import           Data.Conduit.Process            as X
 import qualified Data.Map                        as Map
 import           Distribution.Package            as X (PackageIdentifier (..))
-import           Distribution.PackageDescription as X (FlagName (..), GenericPackageDescription)
+import           Distribution.PackageDescription as X (FlagName, GenericPackageDescription)
 import           Distribution.Version            as X (Version, VersionRange)
 import           Distribution.Version            as X (withinRange, versionNumbers, mkVersion)
 import           Distribution.Types.PackageName  as X (PackageName, mkPackageName, unPackageName)
