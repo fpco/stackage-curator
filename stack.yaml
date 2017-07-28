@@ -3,6 +3,6 @@ extra-deps:
 - Cabal-2.0.0.2
 - cabal-doctest-1.0.2
 
-flags:
-  Cabal:
-    parsec: true
+#flags:
+#  Cabal:
+#    parsec: true
