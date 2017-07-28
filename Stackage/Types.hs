@@ -128,12 +128,15 @@ data BuildPlan = BuildPlan
     , bpAllCabalHashesCommit :: Maybe Text
     , bpNoRevisions :: !(Set PackageName)
     -- ^ Packages where we ignore Hackage revisions
+    , bpCabalFormatVersion :: !(Maybe Version)
+    -- ^ Maximum allowed version of the Cabal file format
     }
     deriving (Show, Eq)
 
 instance ToJSON BuildPlan where
     toJSON BuildPlan {..} = object
         $ maybe id (\x -> (("all-cabal-hashes-commit" .= x):)) bpAllCabalHashesCommit
+        $ maybe id (\x -> (("cabal-format-version" .= display x):)) bpCabalFormatVersion
         [ "system-info" .= bpSystemInfo
         , "tools" .= fmap goTool bpTools
         , "packages" .= Map.mapKeysWith const unPackageName bpPackages
@@ -155,6 +158,8 @@ instance FromJSON BuildPlan where
         bpBuildToolOverrides <- o .:? "build-tool-overrides" .!= mempty
         bpAllCabalHashesCommit <- o .:? "all-cabal-hashes-commit"
         bpNoRevisions <- Set.map C.mkPackageName <$> o .:? "no-revisions" .!= mempty
+        bpCabalFormatVersion <- o .:? "cabal-format-version" >>= T.mapM
+                    (either (fail . show) return . simpleParse . asText)
         return BuildPlan {..}
       where
         goTool = withObject "Tool" $ \o -> (,)

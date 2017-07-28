@@ -80,6 +80,7 @@ newBuildPlan eallCabalHashesCommit packagesOrig packagesLatest bc@BuildConstrain
         , bpBuildToolOverrides = bcBuildToolOverrides
         , bpAllCabalHashesCommit = either (const Nothing) Just eallCabalHashesCommit
         , bpNoRevisions = bcNoRevisions
+        , bpCabalFormatVersion = bcCabalFormatVersion
         }
   where
     SystemInfo {..} = bcSystemInfo

@@ -40,7 +40,7 @@ toSimpleDesc cc spd = execWriterT $ do
     tell mempty { sdProvidedExes = setFromList
                                  $ map (fromString . fst)
                                  $ spdCondExecutables spd
-                , sdCabalVersion = Option $ Max <$> spdCabalVersion spd
+                , sdCabalVersion = Option $ Just $ Max $ spdCabalVersion spd
                 , sdPackages = unionsWith (<>) $ maybe [] (map
                    $ \(Dependency x y) -> singletonMap x DepInfo
                         { diComponents = setFromList [minBound..maxBound]

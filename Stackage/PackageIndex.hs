@@ -107,7 +107,7 @@ data SimplifiedPackageDescription = SimplifiedPackageDescription
     , spdSetupDeps :: Maybe [Dependency]
     , spdPackageFlags :: Map FlagName Bool
     , spdGithubPings :: Set Text
-    , spdCabalVersion :: Maybe Version
+    , spdCabalVersion :: Version
     }
     deriving Generic
 
@@ -181,27 +181,7 @@ gpdToSpd raw gpd = SimplifiedPackageDescription
         let getFlag MkFlag {..} = (flagName, flagDefault)
          in mapFromList $ map getFlag $ genPackageFlags gpd
     , spdGithubPings = getGithubPings gpd
-    , spdCabalVersion =
-        case specVersionRaw $ packageDescription gpd of
-          Left v -> Just v
-          Right range0 ->
-              let maxRange AnyVersion = Nothing
-                  maxRange (ThisVersion v) = Just v
-                  maxRange (LaterVersion v) = Just v
-                  -- ideally the following case would never happen
-                  maxRange (EarlierVersion v) = Just v
-                  maxRange (WildcardVersion v) = Just v
-                  maxRange (UnionVersionRanges x y) = maxRanges x y
-                  maxRange (IntersectVersionRanges x y) = maxRanges x y
-                  maxRange (VersionRangeParens x) = maxRange x
-
-                  maxRanges x y =
-                      case (maxRange x, maxRange y) of
-                          (Nothing, Nothing) -> Nothing
-                          (Just x', Nothing) -> Just x'
-                          (Nothing, Just y') -> Just y'
-                          (Just x', Just y') -> Just (max x' y')
-               in maxRange range0
+    , spdCabalVersion = specVersion $ packageDescription gpd
     }
   where
     PackageIdentifier name version = package $ packageDescription gpd

@@ -43,7 +43,11 @@ checkBuildPlan failMissingCabal BuildPlan {..}
                     $ singleton "Cabal not found in build plan"
                 | otherwise -> return ()
             Just (ppVersion -> cabalVersion) ->
-                mapM_ (checkCabalVersion cabalVersion) (mapToList bpPackages)
+              let cabalVersion' =
+                    case bpCabalFormatVersion of
+                      Nothing -> cabalVersion
+                      Just formatVersion -> min formatVersion cabalVersion
+               in mapM_ (checkCabalVersion cabalVersion') (mapToList bpPackages)
     -- Only looking at libraries and executables, benchmarks and tests
     -- are allowed to create cycles (e.g. test-framework depends on
     -- text, which uses test-framework in its test-suite).

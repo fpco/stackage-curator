@@ -52,6 +52,9 @@ data BuildConstraints = BuildConstraints
 
     , bcNoRevisions :: !(Set PackageName)
     -- ^ see 'cfNoRevisions'
+
+    , bcCabalFormatVersion :: !(Maybe Version)
+    -- ^ Maximum supported Cabal file format version
     }
 
 -- | Modify the version bounds with the given Dependencies
@@ -127,6 +130,8 @@ data ConstraintFile = ConstraintFile
     , cfBuildToolOverrides      :: Map Text (Set Text)
     , cfSkippedLibProfiling     :: Set PackageName
     , cfGhcMajorVersion         :: Maybe (Int, Int)
+    , cfCabalFormatVersion      :: Maybe (Int, Int)
+    -- ^ Maximum supported Cabal file format version
     , cfTreatAsNonCore          :: Set PackageName
     , cfTellMeWhenItsReleased   :: Map PackageName Version
     , cfHide                    :: Set PackageName
@@ -153,6 +158,7 @@ instance FromJSON ConstraintFile where
         cfGithubUsers <- o .: "github-users"
         cfBuildToolOverrides <- o .:? "build-tool-overrides" .!= mempty
         cfGhcMajorVersion <- o .:? "ghc-major-version" >>= mapM parseMajorVersion
+        cfCabalFormatVersion <- o .:? "cabal-format-version" >>= mapM parseMajorVersion
         cfTreatAsNonCore <- getPackages o "treat-as-non-core" <|> return mempty
         cfTellMeWhenItsReleased <- (fmap mconcat $ o .: "tell-me-when-its-released" >>= mapM toNameVerMap)
                                <?> Key "tell-me-when-its-released"
@@ -238,3 +244,6 @@ toBC ConstraintFile {..} = do
     bcBuildToolOverrides = cfBuildToolOverrides
     bcTellMeWhenItsReleased = cfTellMeWhenItsReleased
     bcNoRevisions = cfNoRevisions
+    bcCabalFormatVersion = fmap
+        (\(x, y) -> mkVersion [x, y])
+        cfCabalFormatVersion
