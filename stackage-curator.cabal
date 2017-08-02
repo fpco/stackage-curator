@@ -41,7 +41,7 @@ library
                        Stackage.Types
   build-depends:       base >= 4 && < 5
                      , containers
-                     , Cabal >= 2.0 && < 2.1
+                     , Cabal-snoy >= 2.0 && < 2.1
                      , tar >= 0.3
                      , zlib
                      , bytestring
@@ -141,7 +141,7 @@ test-suite spec
                      , QuickCheck
                      , text
                      , classy-prelude-conduit
-                     , Cabal
+                     , Cabal-snoy
                      , yaml
                      , containers
                      , http-client

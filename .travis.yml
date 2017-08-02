@@ -29,8 +29,7 @@ before_install:
 script:
 - mkdir -p to-travis
 - stack --version
-- grep '^resolver' stack.yaml > stack-tmp.yaml
-- stack --no-terminal --stack-yaml stack-tmp.yaml build alex # Workaround for cyclic dep bug in Stack
+- stack --no-terminal build alex
 - stack --no-terminal test --install-ghc --copy-bins --local-bin-path to-travis
 - bzip2 to-travis/stackage-curator
 
