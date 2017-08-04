@@ -5,3 +5,6 @@ packages:
   extra-dep: true
   subdirs:
   - Cabal
+
+ghc-options:
+  Cabal: "-O2"
