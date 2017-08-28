@@ -1,10 +1,10 @@
 resolver: lts-9.0
 packages:
 - .
-- location: https://github.com/snoyberg/cabal/archive/19e43a8d767dbb43fa14ba373ba09429bbb73355.zip
-  extra-dep: true
-  subdirs:
-  - Cabal
-
+extra-deps:
+- Cabal-2.0.0.2
+flags:
+  Cabal:
+    parsec: true
 ghc-options:
   Cabal: "-O2"
