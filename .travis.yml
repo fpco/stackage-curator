@@ -29,9 +29,8 @@ before_install:
 script:
 - mkdir -p to-travis
 - stack --version
-- stack --no-terminal build alex
-- stack --no-terminal build store
-- stack --no-terminal test --install-ghc --copy-bins --local-bin-path to-travis
+- stack --no-terminal --install-ghc install alex
+- stack --no-terminal --install-ghc test --copy-bins --local-bin-path to-travis
 - bzip2 to-travis/stackage-curator
 
 cache:
