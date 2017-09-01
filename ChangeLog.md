@@ -1,3 +1,7 @@
+## Unreleased changes
+
+* `skipped-haddocks`
+
 ## 0.15.0.0
 
 * Ignore packages with invalid flag definitions [fpco/stackage#2468](https://github.com/fpco/stackage/issues/2468)

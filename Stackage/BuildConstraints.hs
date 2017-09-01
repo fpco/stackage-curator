@@ -125,6 +125,8 @@ data ConstraintFile = ConstraintFile
     , cfExpectedBenchFailures   :: Set PackageName
     , cfExpectedHaddockFailures :: Set PackageName
     , cfSkippedBenchmarks       :: Set PackageName
+    , cfSkippedHaddocks         :: !(Set PackageName)
+    -- ^ Haddocks which should not be built
     , cfPackages                :: Map Maintainer (Vector Dependency)
     , cfGithubUsers             :: Map Text (Set Text)
     , cfBuildToolOverrides      :: Map Text (Set Text)
@@ -151,6 +153,7 @@ instance FromJSON ConstraintFile where
                                <|> pure mempty -- backwards compat
         cfExpectedHaddockFailures <- getPackages o "expected-haddock-failures"
         cfSkippedBenchmarks <- getPackages o "skipped-benchmarks"
+        cfSkippedHaddocks <- getPackages o "skipped-haddocks" <|> return mempty
         cfSkippedLibProfiling <- getPackages o "skipped-profiling"
         cfPackages <- o .: "packages"
                   >>= mapM (mapM toDep)
@@ -232,8 +235,8 @@ toBC ConstraintFile {..} = do
             | name `member` cfExpectedBenchFailures = ExpectFailure
             | otherwise = ExpectSuccess
         pcHaddocks
+            | name `member` cfSkippedHaddocks = Don'tBuild
             | name `member` cfExpectedHaddockFailures = ExpectFailure
-
             | otherwise = ExpectSuccess
         pcFlagOverrides = fromMaybe mempty $ lookup name cfPackageFlags
         pcConfigureArgs = fromMaybe mempty $ lookup name cfConfigureArgs
