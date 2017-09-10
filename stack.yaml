@@ -1,10 +1,1 @@
-resolver: lts-9.0
-packages:
-- .
-extra-deps:
-- Cabal-2.0.0.2
-flags:
-  Cabal:
-    parsec: true
-ghc-options:
-  Cabal: "-O2"
+resolver: nightly-2017-09-10

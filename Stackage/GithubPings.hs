@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ViewPatterns      #-}
 {-# LANGUAGE GADTs             #-}
+{-# LANGUAGE FlexibleContexts  #-}
 module Stackage.GithubPings
     ( getGithubPings
     , applyGithubMapping

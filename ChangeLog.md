@@ -1,6 +1,8 @@
-## Unreleased changes
+## 0.15.1.0
 
 * `skipped-haddocks`
+* Support for GHC 8.2
+* Switch from cryptohash to cryptonite
 
 ## 0.15.0.0
 

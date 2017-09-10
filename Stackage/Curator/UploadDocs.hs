@@ -19,8 +19,7 @@ import           Control.Monad.Trans.RWS.Ref   (MonadRWS, get, modify, put,
                                                 runRWSIORefT, tell)
 import           Crypto.Hash                   (Digest, SHA256)
 import           Crypto.Hash.Conduit           (sinkHash)
-import           Data.Byteable                 (toBytes)
-import qualified Data.ByteString.Base16        as B16
+import           Data.ByteArray                (convert)
 import           Data.Conduit.Zlib             (WindowBits (WindowBits),
                                                 compress)
 import           Data.Function                 (fix)
@@ -46,6 +45,7 @@ import           Text.Blaze.Html.Renderer.Utf8 (renderHtml)
 import           Text.HTML.DOM                 (eventConduit)
 import           Text.XML                      (fromEvents)
 import Control.Concurrent (threadDelay)
+import Data.ByteArray.Encoding
 
 upload :: (MonadResource m)
        => Bool -- ^ compression?
@@ -253,7 +253,7 @@ getName src = do
 toHash :: M m => FilePath -> m Text
 toHash src = do
     (digest, lbs) <- sourceFile src $$ sink
-    let hash' = unpack $ decodeUtf8 $ B16.encode $ toBytes (digest :: Digest SHA256)
+    let hash' = unpack $ decodeUtf8 $ asByteString $ convertToBase Base16 (digest :: Digest SHA256)
         name = pack $ F.encodeString $ F.addExtensions (fromString $ "byhash" </> hash') (F.extensions $ fromString src)
     (m, s) <- get
     unless (name `member` s) $ do

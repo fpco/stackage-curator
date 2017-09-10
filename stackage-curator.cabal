@@ -1,5 +1,5 @@
 name:                stackage-curator
-version:             0.15.0.0
+version:             0.15.1.0
 synopsis:            Tools for curating Stackage bundles
 description:         Please see <http://www.stackage.org/package/stackage-curator> for a description and documentation.
 homepage:            https://github.com/fpco/stackage-curator
@@ -82,10 +82,9 @@ library
                      , amazonka-s3
                      , amazonka-core
                      , xml-types
-                     , base16-bytestring
-                     , byteable
-                     , cryptohash
-                     , cryptohash-conduit
+                     , cryptonite
+                     , cryptonite-conduit
+                     , memory
                      , resourcet
                      , lucid
                      , store

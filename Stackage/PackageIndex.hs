@@ -43,15 +43,13 @@ import           Stackage.Prelude
 import           Stackage.GithubPings
 import           System.Directory                      (getAppUserDataDirectory, createDirectoryIfMissing, doesFileExist)
 import           System.FilePath                       (takeDirectory)
-import qualified Data.ByteString.Base16                as B16
-import qualified Crypto.Hash.SHA256                    as SHA256
 import           Crypto.Hash                 (MD5 (..), SHA1 (..), SHA256 (..),
                                               SHA512 (..), Skein512_512 (..), hashlazy,
-                                              Digest, HashAlgorithm, digestToHexByteString)
-import qualified Crypto.Hash.SHA1 as SHA1
+                                              Digest, HashAlgorithm)
 import           Data.Store                            (Store (..), Size (..))
 import qualified Data.Store                            as Store
 import qualified Data.Store.TypeHash                   as Store
+import Data.ByteArray.Encoding
 
 -- | Name of the 00-index.tar downloaded from Hackage.
 getPackageIndexPath :: MonadIO m => m FilePath
@@ -157,19 +155,19 @@ gpdToSpd raw gpd = SimplifiedPackageDescription
             let go :: (Show ha, HashAlgorithm ha) => ha -> (Text, Text)
                 go constr = (tshow constr, unwrap constr (hashlazy raw))
                 unwrap :: ha -> Digest ha -> Text
-                unwrap _ = decodeUtf8 . digestToHexByteString
+                unwrap _ = decodeUtf8 . convertToBase Base16
              in mapFromList
                     [ go SHA1
                     , go SHA256
                     , go SHA512
                     , go Skein512_512
                     , go MD5
-                    , ("GitSHA1", decodeUtf8 $ B16.encode $ SHA1.hashlazy $ concat
+                    , ("GitSHA1", decodeUtf8 $ convertToBase Base16 (hashlazy $ concat
                         [ "blob "
                         , fromStrict $ encodeUtf8 $ tshow $ length raw
                         , "\0"
                         , raw
-                        ])
+                        ] :: Digest SHA1))
                     ]
         }
     , spdCondLibrary = mapCondTree simpleLib <$> condLibrary gpd
@@ -224,7 +222,7 @@ ucfParse root (UnparsedCabalFile name version fp lbs _entry) = liftIO $ do
     tryIO' = try
 
     -- location of the binary cache
-    cache = root </> "cache" </> (unpack $ decodeUtf8 $ B16.encode $ SHA256.hashlazy lbs)
+    cache = root </> "cache" </> (unpack $ decodeUtf8 $ asByteString $ convertToBase Base16 (hashlazy lbs :: Digest SHA256))
 
     -- Parse the desc from the contents of the .cabal file
     parseFromText = do
