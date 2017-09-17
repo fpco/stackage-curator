@@ -1,3 +1,7 @@
+## 0.15.2.0
+
+* Add a check for mistyped or otherwise unknown package names [#47](https://github.com/fpco/stackage-curator/issues/47)
+
 ## 0.15.1.0
 
 * `skipped-haddocks`
