@@ -37,15 +37,16 @@ newBuildPlan :: MonadIO m
              -> BuildConstraints
              -> m BuildPlan
 newBuildPlan eallCabalHashesCommit packagesOrig packagesLatest bc@BuildConstraints {..} = liftIO $ do
-    let unknownPackages = bcPackages `Set.difference` Map.keysSet packagesLatest
-    forM_ (NE.nonEmpty $ setToList unknownPackages) $ \pkgNames -> do
-        putStrLn "Couldn't find the following package names in the package index:"
-        forM_ pkgNames $ \p -> do
-            let mmaintainer = unMaintainer <$> pcMaintainer (bcPackageConstraints p)
-                maintainerT = fromMaybe "" ((++ ")") . (" (" ++) <$> mmaintainer)
-            putStrLn ("- " ++ display p ++ maintainerT)
-        putStrLn "Please check them for typos."
-        error "Exiting due to unknown packages"
+    unless (Map.null packagesLatest) $ do
+        let unknownPackages = bcPackages `Set.difference` Map.keysSet packagesLatest
+        forM_ (NE.nonEmpty $ setToList unknownPackages) $ \pkgNames -> do
+            putStrLn "Couldn't find the following package names in the package index:"
+            forM_ pkgNames $ \p -> do
+                let mmaintainer = unMaintainer <$> pcMaintainer (bcPackageConstraints p)
+                    maintainerT = fromMaybe "" ((++ ")") . (" (" ++) <$> mmaintainer)
+                putStrLn ("- " ++ display p ++ maintainerT)
+            putStrLn "Please check them for typos."
+            error "Exiting due to unknown packages"
 
     let newReleased = mapMaybe checkReleased $ mapToList bcTellMeWhenItsReleased
         checkReleased (name, expectedVersion) =
