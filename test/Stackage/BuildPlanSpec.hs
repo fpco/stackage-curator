@@ -63,7 +63,7 @@ check readPlanFile getPlans = do
     bc <- readPlanFile man
     plans <- getPlans bc
     allCabalHashesCommit <- getAllCabalHashesCommit
-    bp <- newBuildPlan allCabalHashesCommit plans mempty bc
+    bp <- newBuildPlan allCabalHashesCommit plans testLatestPackages bc
     let bs = Y.encode bp
         ebp' = Y.decodeEither bs
 
@@ -150,3 +150,9 @@ testBuildConstraints _ =
     decodeFileEither fp >>=
     either throwIO toBC
     where fp = "test/test-build-constraints.yaml"
+
+-- | Test package set with versions.
+testLatestPackages :: Map PackageName Version
+testLatestPackages =
+     Map.fromList [ (mkPackageName n, mkVersion [0, 0, 0])
+                  | n <- ["bar", "foo", "mu"] ]
