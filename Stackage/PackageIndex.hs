@@ -38,6 +38,7 @@ import           Distribution.PackageDescription
 import           Distribution.PackageDescription.Parse (ParseResult (..),
                                                         parsePackageDescription)
 import           Distribution.ParseUtils               (PError)
+import           Distribution.Simple.BuildToolDepends  (getAllToolDependencies)
 import           Distribution.System                   (Arch, OS)
 import           Stackage.Prelude
 import           Stackage.GithubPings
@@ -191,10 +192,11 @@ gpdToSpd raw gpd = SimplifiedPackageDescription
     simpleTest = helper noModules testBuildInfo
     simpleBench = helper noModules benchmarkBuildInfo
 
+    helper :: (a ->  Set Text) -> (a -> BuildInfo) -> a -> SimplifiedComponentInfo
     helper getModules' getBI x = SimplifiedComponentInfo
         { sciBuildTools = map
           (\(ExeDependency _ name' range) -> (ExeName $ pack $ unUnqualComponentName name', range))
-          (buildToolDepends $ getBI x)
+          (getAllToolDependencies (packageDescription gpd) (getBI x))
         , sciModules = getModules' x
         }
 
