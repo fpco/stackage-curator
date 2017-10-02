@@ -448,7 +448,7 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
         tell' $ "--docdir=" ++ pack (pbDocDir pb </> unpack namever)
         tell' $ "--htmldir=" ++ pack (pbDocDir pb </> unpack namever)
         tell' $ "--haddockdir=" ++ pack (pbDocDir pb </> unpack namever)
-        tell' $ "--flags=" ++ flags
+        when (not $ null flags) $ tell' $ "--flags=" ++ flags
         when (pbEnableLibProfiling && pcEnableLibProfile) $
             tell' "--enable-library-profiling"
         when pbEnableExecDyn $ tell' "--enable-executable-dynamic"
