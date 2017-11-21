@@ -1,6 +1,11 @@
-{-# LANGUAGE NoImplicitPrelude, TemplateHaskell, TupleSections #-}
-
 module Main where
+
+main :: IO ()
+main = error "not yet implemented"
+
+{-
+
+{-# LANGUAGE NoImplicitPrelude, TemplateHaskell, TupleSections #-}
 
 import           Control.Monad
 import qualified Data.Text                    as T
@@ -345,3 +350,5 @@ main = do
     revDepPackage = argument packageRead
         (metavar "PACKAGE-NAME" ++
          help "Package to list reverse deps for")
+
+-}

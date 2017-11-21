@@ -75,21 +75,21 @@ library:
   other-extensions:
   - TemplateHaskell
 
-#executables:
-#  stackage-curator2:
-#    main: stackage.hs
-#    source-dirs: app
-#    other-extensions:
-#    - TemplateHaskell
-#    ghc-options:
-#    - -rtsopts
-#    - -threaded
-#    - -with-rtsopts=-N
-#    dependencies:
-#    - stackage-curator
-#    - optparse-applicative >=0.11
-#    - optparse-simple
-#
+executables:
+  stackage-curator2:
+    main: stackage.hs
+    source-dirs: app
+    other-extensions:
+    - TemplateHaskell
+    ghc-options:
+    - -rtsopts
+    - -threaded
+    - -with-rtsopts=-N
+    dependencies:
+    - stackage-curator
+    - optparse-applicative >=0.11
+    - optparse-simple
+
 #  stackage-build-plan:
 #    main: stackage-build-plan.hs
 #    source-dirs: app
