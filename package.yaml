@@ -1,0 +1,111 @@
+name:        stackage-curator
+version:     0.15.2.0
+synopsis:    Tools for curating Stackage bundles
+description: Please see <http://www.stackage.org/package/stackage-curator> for a description and documentation.
+category:    Distribution
+author:      Michael Snoyman
+maintainer:  michael@fpcomplete.com
+license:     MIT
+github:      fpco/stackage-curator
+
+extra-source-files:
+- README.md
+- ChangeLog.md
+- test/test-build-constraints.yaml
+
+dependencies:
+- Cabal >=2.0 && <2.1
+- aeson
+- amazonka >=1.4.5
+- amazonka-core
+- amazonka-s3
+- async
+- base >=4 && <5
+- blaze-html
+- bytestring
+- classy-prelude-conduit >=0.12
+- conduit
+- conduit-extra
+- containers
+- cryptonite
+- cryptonite-conduit
+- data-default-class
+- directory
+- exceptions
+- filepath
+- hashable
+- html-conduit
+- http-client >=0.5
+- http-client-tls
+- http-conduit
+- lucid
+- memory
+- mime-types
+- monad-unlift >=0.2
+- monad-unlift-ref >=0.2
+- mono-traversable
+- mtl
+- old-locale
+- process
+- resourcet
+- safe
+- semigroups
+- stm
+- store
+- streaming-commons >=0.1.7.1
+- syb
+- system-fileio
+- system-filepath
+- tar >=0.3
+- temporary
+- text
+- time
+- transformers
+- unix-compat
+- unordered-containers
+- utf8-string
+- vector
+- xml-conduit
+- xml-types
+- yaml
+- zlib
+
+library:
+  source-dirs: src
+  other-extensions:
+  - TemplateHaskell
+
+executables:
+  stackage-curator:
+    main: stackage.hs
+    source-dirs: app
+    other-extensions:
+    - TemplateHaskell
+    ghc-options:
+    - -rtsopts
+    - -threaded
+    - -with-rtsopts=-N
+    dependencies:
+    - stackage-curator
+    - optparse-applicative >=0.11
+    - optparse-simple
+
+  stackage-build-plan:
+    main: stackage-build-plan.hs
+    source-dirs: app
+    other-extensions:
+    - TemplateHaskell
+    dependencies:
+    - base
+    - stackage-curator
+    - optparse-applicative
+    - optparse-simple
+
+tests:
+  spec:
+    main: Spec.hs
+    source-dirs: test
+    dependencies:
+    - stackage-curator
+    - hspec
+    - QuickCheck
