@@ -1,5 +1,5 @@
 name:        stackage-curator
-version:     0.15.2.0
+version:     2.0.0.0
 synopsis:    Tools for curating Stackage bundles
 description: Please see <http://www.stackage.org/package/stackage-curator> for a description and documentation.
 category:    Distribution
@@ -76,7 +76,7 @@ library:
   - TemplateHaskell
 
 executables:
-  stackage-curator:
+  stackage-curator2:
     main: stackage.hs
     source-dirs: app
     other-extensions:

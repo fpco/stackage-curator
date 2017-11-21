@@ -36,7 +36,7 @@ script:
 # uncomment and remove alex addon after removing Cabal-2.0 extra-dep from stack.yaml
 #- stack --no-terminal --install-ghc build alex
 - stack --no-terminal --install-ghc test --copy-bins --local-bin-path to-travis
-- bzip2 to-travis/stackage-curator
+- bzip2 to-travis/stackage-curator2
 
 cache:
   directories:

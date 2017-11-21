@@ -1,5 +1,6 @@
-## Unreleased
+## 2.0.0.0
 
+* Use Stack to perform builds. Major overhaul, incompatible with old versions!
 * Use Cabal.Simple.BuildToolDepends.getAllToolDependencies to compute the tools field of SimpleDesc [#52](https://github.com/fpco/stackage-curator/issues/52)
 
 ## 0.15.2.0
