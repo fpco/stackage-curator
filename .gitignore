@@ -14,3 +14,4 @@ lts-*.yaml
 /.stack-work/
 /dist-stack/
 stackage-curator.cabal
+*~
