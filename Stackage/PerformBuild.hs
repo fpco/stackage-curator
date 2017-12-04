@@ -24,7 +24,7 @@ import           Data.Generics               (mkT, everywhere)
 import qualified Data.Map                    as Map
 import           Data.NonNull                (fromNullable)
 import           Distribution.PackageDescription (buildType, packageDescription, BuildType (Simple),
-                                                 condTestSuites)
+                                                 condTestSuites, condBenchmarks)
 import           Distribution.Package        (Dependency (..))
 import           Distribution.PackageDescription.PrettyPrint (writeGenericPackageDescription)
 import           Distribution.Types.UnqualComponentName
@@ -614,7 +614,8 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
         let needTest = pbEnableTests
                     && checkPrevResult prevTestResult pcTests
                     && not pcSkipBuild
-        when needTest $ withUnpacked $ \gpd childDir -> do
+            hasTests = not . null . condTestSuites
+        when needTest $ withUnpacked $ \gpd childDir -> when (hasTests gpd) $ do
             let run = runIn childDir getOutH
                 cabal = setup run
 
@@ -663,7 +664,8 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
         let needTest = pbEnableBenches
                     && checkPrevResult prevBenchResult pcBenches
                     && not pcSkipBuild
-        when needTest $ withUnpacked $ \_gpd childDir -> do
+            hasBenches = not . null . condBenchmarks
+        when needTest $ withUnpacked $ \gpd childDir -> when (hasBenches gpd) $ do
             let run = runIn childDir getOutH
                 cabal = setup run
 
