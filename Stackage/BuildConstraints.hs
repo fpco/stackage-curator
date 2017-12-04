@@ -140,6 +140,8 @@ data ConstraintFile = ConstraintFile
     -- ^ Packages which should be hidden after registering
     , cfNoRevisions             :: !(Set PackageName)
     -- ^ Packages where we should ignore any Hackage revisions
+    , cfNonParallelBuild        :: !(Set PackageName)
+    -- ^ Don't build these in parallel
     }
 
 instance FromJSON ConstraintFile where
@@ -167,6 +169,7 @@ instance FromJSON ConstraintFile where
                                <?> Key "tell-me-when-its-released"
         cfHide <- Set.map mkPackageName <$> o .:? "hide" .!= mempty
         cfNoRevisions <- Set.map mkPackageName <$> o .:? "no-revisions" .!= mempty
+        cfNonParallelBuild <- Set.map mkPackageName <$> o .:? "non-parallel-build" .!= mempty
         return ConstraintFile {..}
       where
         goFlagMap = Map.mapKeysWith const mkFlagName
@@ -242,6 +245,7 @@ toBC ConstraintFile {..} = do
         pcConfigureArgs = fromMaybe mempty $ lookup name cfConfigureArgs
         pcSkipBuild = name `member` cfSkippedBuilds
         pcHide = name `member` cfHide
+        pcNonParallelBuild = name `member` cfNonParallelBuild
 
     bcGithubUsers = cfGithubUsers
     bcBuildToolOverrides = cfBuildToolOverrides

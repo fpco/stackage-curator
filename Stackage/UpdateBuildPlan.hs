@@ -45,6 +45,7 @@ updateBuildConstraints BuildPlan {..} =
         , pcEnableLibProfile = maybe True pcEnableLibProfile moldPC
         , pcSkipBuild = maybe False pcSkipBuild moldPC
         , pcHide = maybe False pcHide moldPC
+        , pcNonParallelBuild = maybe False pcNonParallelBuild moldPC
         }
       where
         moldBP = lookup name bpPackages

@@ -2,6 +2,7 @@
 
 * Use Cabal.Simple.BuildToolDepends.getAllToolDependencies to compute the tools field of SimpleDesc [#52](https://github.com/fpco/stackage-curator/issues/52)
 * Do not build tests/benches if there are no test suites or benchmarks
+* `non-parallel-build`
 
 ## 0.15.2.0
 

@@ -17,7 +17,6 @@ module Stackage.PerformBuild
     ) where
 
 import           Control.Concurrent.Async    (forConcurrently_)
-import           Control.Concurrent.STM.TSem
 import           Control.Monad.Writer.Strict (execWriter, tell)
 import qualified Data.ByteString             as S
 import           Data.Generics               (mkT, everywhere)
@@ -155,8 +154,24 @@ withCounter counter = bracket_
     (atomically $ modifyTVar counter (+ 1))
     (atomically $ modifyTVar counter (subtract 1))
 
-withTSem :: TSem -> IO a -> IO a
-withTSem sem = bracket_ (atomically $ waitTSem sem) (atomically $ signalTSem sem)
+data TSem = TSem !(TVar Int) !Int
+
+newTSemIO :: Int -> IO TSem
+newTSemIO x = flip TSem x <$> newTVarIO x
+
+withTSem :: Bool -- ^ take all resources?
+         -> TSem
+         -> IO a
+         -> IO a
+withTSem useAll (TSem var total) inner = bracket
+  (atomically $ do
+      avail <- readTVar var
+      let needed = if useAll then total else 1
+      checkSTM $ avail >= needed
+      writeTVar var $! avail - needed
+      return needed)
+  (\needed -> atomically $ modifyTVar var (+ needed))
+  (const inner)
 
 -- | Returns @Nothing@ if installing to a global database
 pbDatabase :: PerformBuild -> Maybe FilePath
@@ -197,7 +212,7 @@ performBuild' pb@PerformBuild {..} = withBuildDir $ \builddir -> do
     pbLog $ encodeUtf8 "Copying built-in Haddocks\n"
     copyBuiltInHaddocks (pbDocDir pb)
 
-    sem <- atomically $ newTSem pbJobs
+    sem <- newTSemIO pbJobs
     active <- newTVarIO (0 :: Int)
     let toolMap = makeToolMap (bpBuildToolOverrides pbPlan) (bpPackages pbPlan)
 
@@ -314,7 +329,7 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
       | otherwise = do
         let wfd comps =
                 waitForDeps sbToolMap sbPackageMap comps pbPlan sbPackageInfo
-                . withTSem sbSem
+                . withTSem pcNonParallelBuild sbSem
         withUnpacked <- wfd libComps buildLibrary
 
         wfd testComps (runTests withUnpacked)

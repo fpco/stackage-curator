@@ -268,6 +268,9 @@ data PackageConstraints = PackageConstraints
     , pcHide             :: !Bool
     -- ^ Hide this package after registering, useful for avoiding
     -- module name conflicts
+    , pcNonParallelBuild :: !Bool
+    -- ^ Is this package so resource intensive that it should be built
+    -- in a non-parallel manner?
     }
     deriving (Show, Eq)
 instance ToJSON PackageConstraints where
@@ -307,6 +310,7 @@ instance FromJSON PackageConstraints where
         pcSkipBuild <- o .:? "skip-build" .!= False
         pcConfigureArgs <- o .:? "configure-args" .!= mempty
         pcHide <- o .:? "hide" .!= False
+        pcNonParallelBuild <- o .:? "non-parallel-build" .!= False
         return PackageConstraints {..}
 
 data TestState = ExpectSuccess
