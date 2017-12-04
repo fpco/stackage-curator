@@ -16,7 +16,7 @@ module Stackage.PerformBuild
     , sdistFilePath
     ) where
 
-import           Control.Concurrent.Async    (async)
+import           Control.Concurrent.Async    (forConcurrently_)
 import           Control.Concurrent.STM.TSem
 import           Control.Monad.Writer.Strict (execWriter, tell)
 import qualified Data.ByteString             as S
@@ -227,7 +227,7 @@ performBuild' pb@PerformBuild {..} = withBuildDir $ \builddir -> do
     haddockFiles <- getHaddockFiles pb >>= newTVarIO
     haddockDeps <- newTVarIO mempty
 
-    forM_ packageMap $ \pi -> void $ Control.Concurrent.Async.async $ singleBuild pb registeredPackages
+    forConcurrently_ packageMap $ \pi -> singleBuild pb registeredPackages
       SingleBuild
         { sbSem = sem
         , sbErrsVar = errsVar
