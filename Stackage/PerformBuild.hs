@@ -348,8 +348,8 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
         [ namever
         , fromMaybe (assert False "") $ do
             cfi <- ppCabalFileInfo $ piPlan sbPackageInfo
-            hash <- lookup "GitSHA1" $ cfiHashes cfi
-            Just $ "@gitsha1:" ++ hash
+            hash <- lookup "SHA256" $ cfiHashes cfi
+            Just $ "@sha256:" ++ hash
         ]
 
     quote :: Text -> Text
