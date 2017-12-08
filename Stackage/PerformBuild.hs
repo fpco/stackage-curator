@@ -630,49 +630,55 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
                     && checkPrevResult prevTestResult pcTests
                     && not pcSkipBuild
             hasTests = not . null . condTestSuites
-        when needTest $ withUnpacked "needTest" $ \gpd childDir -> when (hasTests gpd) $ do
-            let run = runIn childDir getOutH
-                cabal = setup run
+        when needTest $ withUnpacked "needTest" $ \gpd childDir -> do
+          -- If there are tests, run them. If not, then return `Right
+          -- ()`. This was, we'll still save a successful test result
+          -- and avoid re-unpacking next time around.
+          eres <- if hasTests gpd
+            then do
+              let run = runIn childDir getOutH
+                  cabal = setup run
 
-            log' $ "Test configure " ++ namever
-            cabal $ "configure" : "--enable-tests" : configArgs
+              log' $ "Test configure " ++ namever
+              cabal $ "configure" : "--enable-tests" : configArgs
 
-            eres <- tryAny $ do
-                log' $ "Test build " ++ namever
-                cabal ["build"]
+              tryAny $ do
+                  log' $ "Test build " ++ namever
+                  cabal ["build"]
 
-                let tests = map (unUnqualComponentName . fst) $ condTestSuites gpd
-                forM_ tests $ \test -> do
-                    log' $ concat
-                        [ "Test run "
-                        , namever
-                        , " ("
-                        , pack test
-                        , ")"
-                        ]
-                    let exe = "dist/build" </> test </> test
+                  let tests = map (unUnqualComponentName . fst) $ condTestSuites gpd
+                  forM_ tests $ \test -> do
+                      log' $ concat
+                          [ "Test run "
+                          , namever
+                          , " ("
+                          , pack test
+                          , ")"
+                          ]
+                      let exe = "dist/build" </> test </> test
 
-                    exists <- liftIO $ doesFileExist $ childDir </> exe
-                    if exists
-                        then do
-                            mres <- timeout maximumTestSuiteTime $ run (pack exe) []
-                            case mres of
-                                Just () -> return ()
-                                Nothing -> error $ concat
-                                    [ "Test suite timed out: "
-                                    , unpack namever
-                                    , ":"
-                                    , test
-                                    ]
-                        else do
-                            outH <- getOutH
-                            hPut outH $ encodeUtf8 $ asText $ "Test suite not built: " ++ pack test
+                      exists <- liftIO $ doesFileExist $ childDir </> exe
+                      if exists
+                          then do
+                              mres <- timeout maximumTestSuiteTime $ run (pack exe) []
+                              case mres of
+                                  Just () -> return ()
+                                  Nothing -> error $ concat
+                                      [ "Test suite timed out: "
+                                      , unpack namever
+                                      , ":"
+                                      , test
+                                      ]
+                          else do
+                              outH <- getOutH
+                              hPut outH $ encodeUtf8 $ asText $ "Test suite not built: " ++ pack test
+            else return $ Right ()
 
-            savePreviousResult pb Test pident $ either (const False) (const True) eres
-            case (eres, pcTests) of
-                (Left e, ExpectSuccess) -> throwM e
-                (Right (), ExpectFailure) -> warn $ namever ++ ": unexpected test success"
-                _ -> return ()
+          savePreviousResult pb Test pident $ either (const False) (const True) eres
+          case (eres, pcTests) of
+            (Left e, ExpectSuccess) -> throwM e
+            (Right (), ExpectFailure) -> warn $ namever ++ ": unexpected test success"
+            _ -> return ()
 
     buildBenches withUnpacked = wf benchOut $ \getOutH -> do
         prevBenchResult <- getPreviousResult pb Bench pident
@@ -681,21 +687,28 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
                     && not pcSkipBuild
             hasBenches = not . null . condBenchmarks
         when needBench $ withUnpacked "needBench" $ \gpd childDir -> when (hasBenches gpd) $ do
-            let run = runIn childDir getOutH
-                cabal = setup run
+          -- See explanation for this above in the test section
+          eres <-
+            if hasBenches gpd
+              then do
+                let run = runIn childDir getOutH
+                    cabal = setup run
 
-            log' $ "Benchmark configure " ++ namever
-            cabal $ "configure" : "--enable-benchmarks" : configArgs
+                log' $ "Benchmark configure " ++ namever
+                cabal $ "configure" : "--enable-benchmarks" : configArgs
 
-            eres <- tryAny $ do
-                log' $ "Benchmark build " ++ namever
-                cabal ["build"]
+                tryAny $ do
+                    log' $ "Benchmark build " ++ namever
+                    cabal ["build"]
 
-            savePreviousResult pb Bench pident $ either (const False) (const True) eres
-            case (eres, pcBenches) of
-                (Left e, ExpectSuccess) -> throwM e
-                (Right (), ExpectFailure) -> warn $ namever ++ ": unexpected benchmark success"
-                _ -> return ()
+              else return $ Right ()
+
+          savePreviousResult pb Bench pident $ either (const False) (const True) eres
+          case (eres, pcBenches) of
+            (Left e, ExpectSuccess) -> throwM e
+            (Right (), ExpectFailure) -> warn $ namever ++ ": unexpected benchmark success"
+            _ -> return ()
+
 
     warn t = atomically $ modifyTVar sbWarningsVar (. (t:))
 
