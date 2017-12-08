@@ -21,6 +21,7 @@ module Stackage.BuildConstraints
 import           Control.Monad.Writer.Strict (execWriter, tell)
 import           Data.Aeson
 import           Data.Aeson.Internal         ((<?>), JSONPathElement (Key))
+import           Data.Char                   (isLower)
 import qualified Data.Map                    as Map
 import qualified Data.Set                    as Set
 import           Data.Yaml                   (decodeEither', decodeFileEither)
@@ -146,7 +147,9 @@ data ConstraintFile = ConstraintFile
 
 instance FromJSON ConstraintFile where
     parseJSON = withObject "ConstraintFile" $ \o -> do
-        cfPackageFlags <- (goPackageMap . fmap goFlagMap) <$> o .: "package-flags"
+        cfPackageFlags <- (o .: "package-flags")
+                      >>= fmap goPackageMap
+                        . mapM (fmap Map.fromList . mapM goFlagPair . Map.toList)
         cfConfigureArgs <- goPackageMap <$> o .:? "configure-args" .!= mempty
         cfSkippedTests <- getPackages o "skipped-tests"
         cfSkippedBuilds <- getPackages o "skipped-builds" <|> return mempty
@@ -172,7 +175,11 @@ instance FromJSON ConstraintFile where
         cfNonParallelBuild <- Set.map mkPackageName <$> o .:? "non-parallel-build" .!= mempty
         return ConstraintFile {..}
       where
-        goFlagMap = Map.mapKeysWith const mkFlagName
+        goFlagPair :: Monad m => (Text, v) -> m (FlagName, v)
+        goFlagPair (t, v)
+          | t == toLower t = return (mkFlagName $ unpack t, v)
+          | otherwise = fail $ "Non-lowercase flag name, " ++ unpack t ++ ". See https://github.com/fpco/stackage-curator/issues/57"
+
         goPackageMap = Map.mapKeysWith const mkPackageName
         getPackages o name = (setFromList . map mkPackageName) <$> o .: name
 
