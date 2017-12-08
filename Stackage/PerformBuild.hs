@@ -486,7 +486,7 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
 
     buildLibrary = wf libOut $ \getOutH -> do
         gpdRef <- newIORef Nothing
-        let withUnpacked inner' = do
+        let withUnpacked reason inner' = do
                 mgpd <- readIORef gpdRef
                 (gpd, childDir) <-
                     case mgpd of
@@ -501,7 +501,7 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
                                         ]
                                     return $ sbBuildDir </> "cabal" </> "Cabal"
                                 else do
-                                    log' $ "Unpacking " ++ nameverrevhash
+                                    log' $ "Unpacking " ++ nameverrevhash ++ " (reason: " ++ reason ++ ")"
                                     case ppSourceUrl $ piPlan sbPackageInfo of
                                         Nothing -> runParent getOutH "stack" ["unpack", nameverrevhash]
                                         Just url -> unpackFromURL sbBuildDir url
@@ -514,7 +514,7 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
                 inner' gpd childDir
 
         isConfiged <- newIORef False
-        let withConfiged inner' = withUnpacked $ \_gpd childDir -> do
+        let withConfiged reason inner' = withUnpacked ("withConfiged: " ++ reason) $ \_gpd childDir -> do
                 let run a b = do when pbVerbose $ log' (unwords (a : b))
                                  runIn childDir getOutH a b
                     cabal = setup run
@@ -538,7 +538,7 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
                         ]
                     return True
                 | otherwise -> return False
-        when toBuild $ withConfiged $ \childDir cabal -> do
+        when toBuild $ withConfiged "toBuild" $ \childDir cabal -> do
             deletePreviousResults pb pident
 
             log' $ "Building " ++ namever
@@ -567,7 +567,7 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
                        && checkPrevResult prevHaddockResult pcHaddocks
                        && not (null $ sdModules $ ppDesc $ piPlan sbPackageInfo)
                        && not pcSkipBuild
-        when needHaddock $ withConfiged $ \childDir cabal -> do
+        when needHaddock $ withConfiged "needHaddock" $ \childDir cabal -> do
             log' $ "Haddocks " ++ namever
             hfs <- readTVarIO sbHaddockFiles
             haddockDeps <- atomically $ getHaddockDeps pbPlan sbHaddockDeps pname
@@ -630,7 +630,7 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
                     && checkPrevResult prevTestResult pcTests
                     && not pcSkipBuild
             hasTests = not . null . condTestSuites
-        when needTest $ withUnpacked $ \gpd childDir -> when (hasTests gpd) $ do
+        when needTest $ withUnpacked "needTest" $ \gpd childDir -> when (hasTests gpd) $ do
             let run = runIn childDir getOutH
                 cabal = setup run
 
@@ -676,11 +676,11 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
 
     buildBenches withUnpacked = wf benchOut $ \getOutH -> do
         prevBenchResult <- getPreviousResult pb Bench pident
-        let needTest = pbEnableBenches
+        let needBench = pbEnableBenches
                     && checkPrevResult prevBenchResult pcBenches
                     && not pcSkipBuild
             hasBenches = not . null . condBenchmarks
-        when needTest $ withUnpacked $ \gpd childDir -> when (hasBenches gpd) $ do
+        when needBench $ withUnpacked "needBench" $ \gpd childDir -> when (hasBenches gpd) $ do
             let run = runIn childDir getOutH
                 cabal = setup run
 
