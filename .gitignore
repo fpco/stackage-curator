@@ -13,3 +13,4 @@ lts-*.yaml
 /tarballs/
 /.stack-work/
 /dist-stack/
+*~
