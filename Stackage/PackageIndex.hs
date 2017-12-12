@@ -110,10 +110,6 @@ data SimplifiedPackageDescription = SimplifiedPackageDescription
     }
     deriving Generic
 
-#if !MIN_VERSION_base(4, 9, 0)
-deriving instance Generic Version
-#endif
-
 instance Store SimplifiedPackageDescription
 instance Store a => Store (CondTree ConfVar [Dependency] a)
 instance Store a => Store (CondBranch ConfVar [Dependency] a)
