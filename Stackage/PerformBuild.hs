@@ -686,7 +686,7 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
                     && checkPrevResult prevBenchResult pcBenches
                     && not pcSkipBuild
             hasBenches = not . null . condBenchmarks
-        when needBench $ withUnpacked "needBench" $ \gpd childDir -> when (hasBenches gpd) $ do
+        when needBench $ withUnpacked "needBench" $ \gpd childDir -> do
           -- See explanation for this above in the test section
           eres <-
             if hasBenches gpd
