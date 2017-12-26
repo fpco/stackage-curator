@@ -291,6 +291,7 @@ instance ToJSON PackageConstraints where
         , "skip-build" .= pcSkipBuild
         , "configure-args" .= pcConfigureArgs
         , "hide" .= pcHide
+        , "non-parallel-build" .= pcNonParallelBuild
         ]
       where
         addMaintainer = maybe id (\m -> (("maintainer" .= m):)) pcMaintainer
