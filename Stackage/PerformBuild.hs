@@ -980,7 +980,7 @@ createSetupHs dir name allowNewer = do
                 writeGenericPackageDescription cabalFP gpd
                 return gpd
             else return gpd'
-    let simple = buildType (packageDescription gpd) == Just Simple
+    let simple = buildType (packageDescription gpd) == Simple
     when simple $ do
         _ <- tryIO' $ removeFile $ fromString setuplhs
         writeFile setuphs $ asByteString "import Distribution.Simple\nmain = defaultMain\n"

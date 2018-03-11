@@ -1,1 +1,4 @@
-resolver: nightly-2017-12-01
+resolver: nightly-2018-03-10
+extra-deps:
+- Cabal-2.2.0.0@rev:1
+- lens-4.16@rev:3

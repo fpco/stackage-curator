@@ -34,9 +34,8 @@ import           Distribution.Types.ExeDependency
 import           Distribution.Version                  (VersionRange (..))
 import           Distribution.Package                  (Dependency (..))
 import           Distribution.PackageDescription
-import           Distribution.PackageDescription.Parse (ParseResult (..),
-                                                        parsePackageDescription)
-import           Distribution.ParseUtils               (PError)
+import           Distribution.PackageDescription.Parsec(parseGenericPackageDescription, runParseResult)
+import           Distribution.Parsec.Common            (PError)
 import           Distribution.Simple.BuildToolDepends  (getAllToolDependencies)
 import           Distribution.System                   (Arch, OS)
 import           Stackage.Prelude
@@ -236,12 +235,9 @@ gpdFromLBS :: MonadThrow m
            -> LByteString
            -> m GenericPackageDescription
 gpdFromLBS fp lbs =
-    case parsePackageDescription $ unpack $ dropBOM $ decodeUtf8 lbs of
-        ParseFailed e -> throwM $ CabalParseException fp e
-        ParseOk _warnings gpd -> return gpd
-  where
-    -- https://github.com/haskell/hackage-server/issues/351
-    dropBOM t = fromMaybe t $ stripPrefix "\xFEFF" t
+    case snd $ runParseResult $ parseGenericPackageDescription $ toStrict lbs of
+        Left e -> throwM $ CabalParseException fp e
+        Right gpd -> return gpd
 
 -- | Stream all of the cabal files from the 00-index tar file.
 sourcePackageIndex :: (MonadThrow m, MonadResource m, MonadActive m, MonadBaseControl IO m)
@@ -284,7 +280,7 @@ data InvalidCabalPath = InvalidCabalPath Text Text
     deriving (Show, Typeable)
 instance Exception InvalidCabalPath
 
-data CabalParseException = CabalParseException FilePath PError
+data CabalParseException = CabalParseException FilePath (Maybe Version, [PError])
                          | MismatchedNameVersion FilePath PackageName PackageName Version Version
     deriving (Show, Typeable)
 instance Exception CabalParseException
