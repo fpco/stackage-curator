@@ -105,7 +105,8 @@ addDeepDepends name@(unPackageName -> name') = do
 -- Precondition: GHC global package database has only core packages, and GHC
 -- ships with just a single version of each packages.
 getCorePackages :: IO (Map PackageName Version)
-getCorePackages = flip execStateT mempty $ mapM_ (addDeepDepends . mkPackageName)
+getCorePackages = flip execStateT mempty $ do
+  mapM_ (addDeepDepends . mkPackageName)
     [ "ghc"
     , "Cabal"
     {-
@@ -113,6 +114,8 @@ getCorePackages = flip execStateT mempty $ mapM_ (addDeepDepends . mkPackageName
     , "haskell98"
     -}
     ]
+  -- don't count Cabal itself as a core package, just its deps
+  modify $ deleteMap (mkPackageName "Cabal")
 
 -- | A list of executables that are shipped with GHC.
 getCoreExecutables :: IO (Set ExeName)
