@@ -107,6 +107,7 @@ addDeepDepends name@(unPackageName -> name') = do
 getCorePackages :: IO (Map PackageName Version)
 getCorePackages = flip execStateT mempty $ mapM_ (addDeepDepends . mkPackageName)
     [ "ghc"
+    , "Cabal"
     {-
     , "haskell2010"
     , "haskell98"
