@@ -147,7 +147,12 @@ waitForDeps toolMap packageMap activeComps bp pi action = do
     -- Since we build every package using the Cabal library, it's an implicit
     -- dependency of everything
     addCabal :: Set PackageName -> Set PackageName
-    addCabal = insertSet (mkPackageName "Cabal")
+    addCabal =
+      case ppSimpleBuild $ piPlan pi of
+        -- If we know that this is a simple build type, then we can
+        -- build with the Cabal library that ships with GHC
+        Just True -> id
+        _ -> insertSet (mkPackageName "Cabal")
 
 withCounter :: TVar Int -> IO a -> IO a
 withCounter counter = bracket_

@@ -105,6 +105,7 @@ data SimplifiedPackageDescription = SimplifiedPackageDescription
     , spdPackageFlags :: Map FlagName Bool
     , spdGithubPings :: Set Text
     , spdCabalVersion :: Version
+    , spdSimpleBuild :: !Bool
     }
     deriving Generic
 
@@ -175,6 +176,7 @@ gpdToSpd raw gpd = SimplifiedPackageDescription
          in mapFromList $ map getFlag $ genPackageFlags gpd
     , spdGithubPings = getGithubPings gpd
     , spdCabalVersion = specVersion $ packageDescription gpd
+    , spdSimpleBuild = buildType (packageDescription gpd) == Simple
     }
   where
     PackageIdentifier name version = package $ packageDescription gpd

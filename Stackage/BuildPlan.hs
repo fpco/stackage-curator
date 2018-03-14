@@ -181,6 +181,7 @@ mkPackagePlan bc spd = do
     ppConstraints = onlyRelevantFlags $ bcPackageConstraints bc name
     ppUsers = mempty -- must be filled in later
     ppSourceUrl = Nothing
+    ppSimpleBuild = Just $ spdSimpleBuild spd
 
     -- Only include flags that are actually provided by the package. For more
     -- information, see: https://github.com/fpco/stackage-curator/issues/11

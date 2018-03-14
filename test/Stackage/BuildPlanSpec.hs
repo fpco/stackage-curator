@@ -115,6 +115,7 @@ makePackageSet ps _ =
                 ,ppSourceUrl = Nothing
                 ,ppGithubPings = mempty
                 ,ppUsers = mempty
+                ,ppSimpleBuild = Nothing
                 ,ppConstraints =
                     PackageConstraints
                         {pcVersionRange = anyV

@@ -176,12 +176,14 @@ data PackagePlan = PackagePlan
     , ppConstraints :: PackageConstraints
     , ppDesc        :: SimpleDesc
     , ppSourceUrl   :: Maybe Text
+    , ppSimpleBuild :: !(Maybe Bool)
     }
     deriving (Show, Eq)
 
 instance ToJSON PackagePlan where
     toJSON PackagePlan {..} = object
         $ maybe id (\cfi -> (("cabal-file-info" .= cfi):)) ppCabalFileInfo
+        $ maybe id (\sb -> (("simple-build" .= sb):)) ppSimpleBuild
         $ maybe id (\cfi -> (("source-url" .= cfi):)) ppSourceUrl $
         [ "version"      .= asText (display ppVersion)
         , "github-pings" .= ppGithubPings
@@ -200,6 +202,7 @@ instance FromJSON PackagePlan where
         ppConstraints <- o .: "constraints"
         ppDesc <- o .: "description"
         ppSourceUrl <- o .:? "source-url"
+        ppSimpleBuild <- o .:? "simple-build"
         return PackagePlan {..}
 
 -- | Information on the contents of a cabal file
