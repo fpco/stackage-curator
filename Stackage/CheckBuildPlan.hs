@@ -70,6 +70,7 @@ checkDeps :: (PackageName -> Maybe Maintainer)
 checkDeps getMaint allPackages (user, pb) =
     mapM_ go $ mapToList $ sdPackages $ ppDesc pb
   where
+    go ("Win32", _) = pure ()
     go (dep, depInfo@(DepInfo _ range)) =
         case lookup dep allPackages of
             Nothing -> tell $ BadBuildPlan (singletonMap (dep, getMaint dep, Nothing) errMap) mempty

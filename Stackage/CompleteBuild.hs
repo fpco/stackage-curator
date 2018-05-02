@@ -104,8 +104,7 @@ createPlan target dest constraints addPackages expectTestFailures expectBenchFai
           $ flip (foldr addPackage) addPackages
           $ setConstraints constraints bc
 
-    putStrLn $ "Writing build plan to " ++ pack dest
-    encodeFile dest plan
+    writeBuildPlan dest plan
   where
     -- Add a new package to the build constraints
     addPackage :: PackageName -> BuildConstraints -> BuildConstraints
@@ -120,6 +119,16 @@ createPlan target dest constraints addPackages expectTestFailures expectBenchFai
             (if name == name' then f else id)
             (bcPackageConstraints bc name')
         }
+
+writeBuildPlan :: MonadIO m => FilePath -> BuildPlan -> m ()
+writeBuildPlan dest plan = liftIO $ do
+    putStrLn $ "Writing build plan to " ++ pack dest
+    encodeFile dest $ dropWindowsPackages plan
+
+dropWindowsPackages :: BuildPlan -> BuildPlan
+dropWindowsPackages plan = plan
+    { bpPackages = deleteMap "Win32" (bpPackages plan)
+    }
 
 planFromConstraints :: MonadIO m => BuildConstraints -> m BuildPlan
 planFromConstraints bc = do
@@ -152,10 +161,9 @@ checkPlan mfp = stillAlive $ do
 
                 plan <- planFromConstraints bc
 
-                putStrLn "Writing build plan to check-plan.yaml"
-                encodeFile "check-plan.yaml" plan
+                writeBuildPlan "check-plan.yaml" plan
 
-                return plan
+                return $ dropWindowsPackages plan
             Just fp -> do
                 putStrLn $ "Loading plan from " ++ pack fp
                 decodeFileEither fp >>= either throwM return
