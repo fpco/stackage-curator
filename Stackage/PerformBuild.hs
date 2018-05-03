@@ -136,6 +136,7 @@ waitForDeps toolMap packageMap activeComps bp pi action = do
         case lookup package packageMap of
             Nothing
                 | isCore package -> return ()
+                | package == "Win32" -> return ()
                 | otherwise -> throwSTM $ DependencyMissing package
             Just dep -> do
                 res <- readTMVar $ piResult dep
