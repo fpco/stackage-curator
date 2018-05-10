@@ -338,8 +338,10 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
                 . withTSem pcNonParallelBuild sbSem
         withUnpacked <- wfd libComps buildLibrary
 
-        wfd testComps (runTests withUnpacked)
-        wfd benchComps (buildBenches withUnpacked)
+        when pbEnableTests $
+          wfd testComps (runTests withUnpacked)
+        when pbEnableBenches $
+          wfd benchComps (buildBenches withUnpacked)
 
     pname = piName sbPackageInfo
     pident = PackageIdentifier pname (ppVersion $ piPlan sbPackageInfo)
