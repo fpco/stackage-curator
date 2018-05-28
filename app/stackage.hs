@@ -17,7 +17,6 @@ import           Stackage.Prelude             hiding ((<>))
 import           Stackage.Stats
 import           Stackage.Upload
 import           System.Exit                  (exitWith)
-import           System.IO                    (BufferMode (LineBuffering), hSetBuffering)
 import           Data.Monoid                  ((<>))
 
 main :: IO ()

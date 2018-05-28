@@ -19,11 +19,9 @@ module Stackage.CompleteBuild
     , checkTargetAvailable
     ) where
 
-import System.Directory (getAppUserDataDirectory)
+import System.Directory (getAppUserDataDirectory, createDirectoryIfMissing, doesFileExist, renameFile)
+import System.FilePath (takeDirectory)
 import Distribution.Package (Dependency)
-import Filesystem (createTree, isFile, rename)
-import Filesystem.Path (parent)
-import qualified Filesystem.Path.CurrentOS as F
 import Control.Concurrent        (threadDelay, getNumCapabilities)
 import Control.Concurrent.Async  (withAsync)
 import Data.Yaml                 (decodeFileEither, encodeFile, decodeEither')
@@ -39,8 +37,7 @@ import Stackage.ServerBundle
 import Stackage.UpdateBuildPlan
 import Stackage.Upload
 import System.Environment        (lookupEnv)
-import Filesystem.Path           (dropExtension, filename)
-import Control.Monad.Trans.Unlift (askRunBase, MonadBaseUnlift)
+import System.FilePath           (dropExtension, takeFileName)
 import Data.Function (fix)
 import Control.Concurrent.Async (Concurrently (..))
 import Stackage.Curator.UploadDocs (uploadDocs)
@@ -342,7 +339,7 @@ checkoutRepo target = do
             git ["fetch"]
             git ["checkout", "origin/master"]
         else do
-            createTree $ parent $ fromString repoDir
+            createDirectoryIfMissing True $ takeDirectory repoDir
             runIn "." "git" ["clone", repoUrl, repoDir]
 
     whenM (liftIO $ doesFileExist destFPPlan)
@@ -365,13 +362,13 @@ uploadGithub
 uploadGithub planFile docmapFile target = do
     (git, destFPPlan, destFPDocmap) <- checkoutRepo target
 
-    createTree $ parent $ fromString destFPDocmap
+    createDirectoryIfMissing True $ takeDirectory destFPDocmap
     runResourceT $ do
         sourceFile planFile $$ (sinkFile destFPPlan :: Sink ByteString (ResourceT IO) ())
         sourceFile docmapFile $$ (sinkFile destFPDocmap :: Sink ByteString (ResourceT IO) ())
 
     git ["add", destFPPlan, destFPDocmap]
-    git ["commit", "-m", "Checking in " ++ F.encodeString (filename $ dropExtension $ fromString destFPPlan)]
+    git ["commit", "-m", "Checking in " ++ (takeFileName $ dropExtension $ fromString destFPPlan)]
     git ["push", "origin", "HEAD:master"]
 
 upload
@@ -485,7 +482,7 @@ fetch planFile = do
     parMapM_ 8 (download man stackDir) $ mapToList $ bpPackages plan
   where
     download man stackDir (display -> name, display . ppVersion -> version) = do
-        unlessM (isFile fp) $ do
+        unlessM (doesFileExist fp) $ do
             hPut stdout $ encodeUtf8 $ concat
                 [ "Downloading "
                 , name
@@ -493,12 +490,12 @@ fetch planFile = do
                 , version
                 , "\n"
                 ]
-            createTree $ parent fp
+            createDirectoryIfMissing True $ takeDirectory fp
             req <- parseUrlThrow url
             withResponse req man $ \res -> do
-                let tmp = F.encodeString fp <.> "tmp"
+                let tmp = fp <.> "tmp"
                 runResourceT $ bodyReaderSource (responseBody res) $$ sinkFile tmp
-                rename (fromString tmp) fp
+                renameFile (fromString tmp) fp
       where
         url = unpack $ concat
             [ "https://s3.amazonaws.com/hackage.fpcomplete.com/package/"
@@ -509,15 +506,14 @@ fetch planFile = do
             ]
         fp = sdistFilePath stackDir name version
 
-parMapM_ :: (MonadIO m, MonadBaseUnlift IO m, MonoFoldable mono)
+parMapM_ :: (MonadUnliftIO m, MonoFoldable mono)
          => Int
          -> (Element mono -> m ())
          -> mono
          -> m ()
 parMapM_ (max 1 -> 1) f xs = mapM_ f xs
-parMapM_ cnt f xs0 = do
-    var <- liftBase $ newTVarIO $ toList xs0
-    run <- askRunBase
+parMapM_ cnt f xs0 = withRunInIO $ \run -> do
+    var <- liftIO $ newTVarIO $ toList xs0
     let worker :: IO ()
         worker = run $ fix $ \loop -> join $ atomically $ do
             xs <- readTVar var
@@ -530,7 +526,7 @@ parMapM_ cnt f xs0 = do
                         loop
         workers 1 = Concurrently worker
         workers i = Concurrently worker *> workers (i - 1)
-    liftBase $ runConcurrently $ workers cnt
+    liftIO $ runConcurrently $ workers cnt
 
 -- | Check if the given target is already used in the Github repos
 checkTargetAvailable :: Target -> IO ()

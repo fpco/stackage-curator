@@ -401,15 +401,17 @@ data SimpleDesc = SimpleDesc
     , sdSetupDeps    :: Maybe (Set PackageName)
     }
     deriving (Show, Eq)
-instance Monoid SimpleDesc where
-    mempty = SimpleDesc mempty mempty mempty mempty mempty mempty
-    mappend (SimpleDesc a b c d e f) (SimpleDesc w x y z e' f') = SimpleDesc
+instance Semigroup SimpleDesc where
+    SimpleDesc a b c d e f <> SimpleDesc w x y z e' f' = SimpleDesc
         (Map.unionWith (<>) a w)
         (Map.unionWith (<>) b x)
         (c <> y)
         (d <> z)
         (e <> e')
         (f <> f')
+instance Monoid SimpleDesc where
+    mempty = SimpleDesc mempty mempty mempty mempty mempty mempty
+    mappend = (<>)
 instance ToJSON SimpleDesc where
     toJSON SimpleDesc {..} = object $ addSetupDeps $ addCabalVersion
         [ "packages" .= Map.mapKeysWith const unPackageName sdPackages

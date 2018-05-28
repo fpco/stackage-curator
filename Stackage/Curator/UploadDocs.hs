@@ -16,7 +16,7 @@ import qualified Codec.Archive.Tar             as Tar
 import qualified Codec.Archive.Tar.Entry       as Tar
 import           Control.Monad.Trans.Resource  (liftResourceT)
 import           Control.Monad.Trans.RWS.Ref   (MonadRWS, get, modify, put,
-                                                runRWSIORefT, tell)
+                                                runRWSRefT, RWSRefT, tell)
 import           Crypto.Hash                   (Digest, SHA256)
 import           Crypto.Hash.Conduit           (sinkHash)
 import           Data.ByteArray                (convert)
@@ -26,8 +26,8 @@ import           Data.Function                 (fix)
 import           Data.XML.Types                (Content (ContentText), Event (EventBeginDoctype, EventEndDoctype, EventBeginElement),
                                                 Name)
 import           Distribution.Package          (PackageIdentifier (..))
-import qualified Filesystem                    as F
-import qualified Filesystem.Path.CurrentOS     as F
+import qualified System.FilePath               as F
+import qualified System.Directory              as F
 import           Network.AWS                   (Credentials (Discover), Env,
                                                 newEnv,
                                                 send, toBody, runAWS)
@@ -47,7 +47,7 @@ import           Text.XML                      (fromEvents)
 import Control.Concurrent (threadDelay)
 import Data.ByteArray.Encoding
 
-upload :: (MonadResource m)
+upload :: (MonadResource m, MonadThrow m, PrimMonad m)
        => Bool -- ^ compression?
        -> Env
        -> Text
@@ -87,7 +87,7 @@ uploadDocs input' bundleFile name bucket = do
     unlessM (Dir.doesDirectoryExist input') $ error $ "Could not find directory: " ++ show input'
     input <- fmap (</> "") $ Dir.canonicalizePath input'
 
-    let inner :: M m => m ()
+    let inner :: M ()
         inner = do
           let threads = 16
               size = threads * 2
@@ -110,13 +110,12 @@ uploadDocs input' bundleFile name bucket = do
                 case mres of
                   Nothing -> return ()
                   Just res -> yield res >> loop
-          run <- askRunBase
-          liftIO $ runConcurrently $
+          runConcurrently $
             Concurrently fillQueue *>
               sequence_ (asList $ replicate threads
-                          (Concurrently (run $ srcQueue $$ mapM_C (go input name))))
+                          (Concurrently (srcQueue $$ mapM_C (go input name))))
     runResourceT $ do
-        ((), _, hoogles) <- runRWSIORefT inner (env, bucket) mempty
+        ((), _, hoogles) <- runRWSRefT inner (env, bucket) mempty
 
         lbs <- liftIO $ fmap Tar.write $ mapM toEntry $ toList hoogles
         flip runReaderT (env, bucket) $ do
@@ -126,7 +125,7 @@ uploadDocs input' bundleFile name bucket = do
 -- | Create a TAR entry for each Hoogle txt file. Unfortunately doesn't stream.
 toEntry :: FilePath -> IO Tar.Entry
 toEntry fp = do
-    tp <- either error return $ Tar.toTarPath False $ F.encodeString $ F.filename $ fromString fp
+    tp <- either error return $ Tar.toTarPath False $ F.takeFileName fp
     Tar.packFileEntry fp tp
 
 upload' :: (MonadResource m, MonadReader (Env, Text) m)
@@ -159,22 +158,21 @@ upload' toCompress name src = do
 
 isHoogleFile :: FilePath -> FilePath -> Bool
 isHoogleFile input fp' = fromMaybe False $ do
-    fp <- F.stripPrefix (fromString input F.</> "") (fromString fp')
+    fp <- stripPrefix (input F.</> "") fp'
     [dir, name] <- Just $ F.splitDirectories fp
-    pkgver <- stripSuffix "/" $ pack $ F.encodeString dir
-    (pack . F.encodeString -> pkg, ["txt"]) <- Just $ F.splitExtensions name
+    pkgver <- stripSuffix "/" $ pack dir
+    (pack -> pkg, ".txt") <- Just $ F.splitExtensions name
     PackageIdentifier pkg1 _ver <- simpleParse pkgver
     pkg2 <- simpleParse pkg
     return $ pkg1 == pkg2
 
-go :: M m
-   => FilePath -- ^ prefix for all input
+go :: FilePath -- ^ prefix for all input
    -> Text -- ^ upload name
    -> FilePath -- ^ current file
-   -> m ()
+   -> M ()
 go input name fp
     | isHoogleFile input fp = tell $! singletonSet fp
-    | F.hasExtension (fromString fp) "html" = do
+    | F.takeExtension fp == ".html" = do
         doc <- sourceFile fp
             $= eventConduit
             $= (do
@@ -189,40 +187,38 @@ go input name fp
         -- Sink to a Document and then use blaze-html to render to avoid using
         -- XML rendering rules (e.g., empty elements)
         upload' True key $ sourceLazy (renderHtml $ toHtml doc)
-    | any (F.hasExtension $ fromString fp) $ words "css js png gif" = void $ getName fp
+    | any (\ext -> F.takeExtension fp == ('.':ext)) $ words "css js png gif" = void $ getName fp
     | otherwise = upload' True key $ sourceFile fp
   where
-    Just suffix = F.stripPrefix (fromString input F.</> "") (fromString fp)
+    Just suffix = stripPrefix (input F.</> "") fp
     toRoot = concat $ asList $ replicate (length $ F.splitDirectories suffix) $ asText "../"
-    key = name ++ "/" ++ pack (F.encodeString suffix)
+    key = name ++ "/" ++ pack suffix
     packageUrl = concat
         [ "https://www.stackage.org/"
         , name
         , "/package/"
-        , takeWhile (/= '/') $ pack $ F.encodeString suffix
+        , takeWhile (/= '/') $ pack suffix
         ]
 
-goEvent :: M m
-        => FilePath -- HTML file path
+goEvent :: FilePath -- HTML file path
         -> Text -- ^ relative prefix to root
         -> Text -- ^ package base page
         -> Event
-        -> m Event
+        -> M Event
 goEvent htmlfp toRoot packageUrl (EventBeginElement name attrs) =
     EventBeginElement name <$> mapM (goAttr htmlfp toRoot packageUrl) attrs
 goEvent _ _ _ e = return e
 
-goAttr :: M m
-       => FilePath -- ^ HTML file path
+goAttr :: FilePath -- ^ HTML file path
        -> Text -- ^ relative prefix to root
        -> Text -- ^ package base page
        -> (Name, [Content])
-       -> m (Name, [Content])
+       -> M (Name, [Content])
 goAttr htmlfp toRoot packageUrl pair@(name, [ContentText value])
     | name == "href" && value == "index.html" = return ("href", [ContentText packageUrl])
     | isRef name && not (".html" `isSuffixOf` value) = do
         let fp = FP.takeDirectory htmlfp </> unpack value
-        exists <- liftIO $ F.isFile $ fromString fp
+        exists <- liftIO $ F.doesFileExist fp
         if exists
             then do
                 x <- getName fp
@@ -235,12 +231,9 @@ isRef "href" = True
 isRef "src" = True
 isRef _ = False
 
-type M m = ( MonadRWS (Env, Text) (Set FilePath) (Map FilePath Text, Set Text) m
-           , MonadResource m
-           , MonadBaseUnlift IO m
-           )
+type M = RWSRefT (Env, Text) (Set FilePath) (Map FilePath Text, Set Text) (ResourceT IO)
 
-getName :: M m => FilePath -> m Text
+getName :: FilePath -> M Text
 getName src = do
     (m, _) <- get
     case lookup src m of
@@ -250,11 +243,11 @@ getName src = do
             modify $ \(m', s) -> (insertMap src x m', s)
             return x
 
-toHash :: M m => FilePath -> m Text
+toHash :: FilePath -> M Text
 toHash src = do
     (digest, lbs) <- sourceFile src $$ sink
     let hash' = unpack $ decodeUtf8 $ asByteString $ convertToBase Base16 (digest :: Digest SHA256)
-        name = pack $ F.encodeString $ F.addExtensions (fromString $ "byhash" </> hash') (F.extensions $ fromString src)
+        name = pack $ "byhash" </> hash' F.<.> F.takeExtensions src
     (m, s) <- get
     unless (name `member` s) $ do
         put (m, insertSet name s)

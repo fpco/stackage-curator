@@ -15,9 +15,9 @@ import qualified Data.Text as T
 import           Distribution.Compat.ReadP
 import           Distribution.Package
 import           Distribution.Text (parse)
-import qualified Filesystem.Path.CurrentOS as FP
+import qualified System.FilePath as FP
 import Stackage.Prelude
-import Filesystem (removeTree)
+import System.Directory (removeDirectoryRecursive)
 
 setupPackageDatabase
     :: Maybe FilePath -- ^ database location, Nothing if using global DB
@@ -90,14 +90,14 @@ unregisterPackage log' onUnregister docDir flags ident@(PackageIdentifier name _
         (CT.decodeUtf8
          $= CT.lines
          $= CL.mapMaybe parseLibraryDir
-         $= CL.mapM_ (void . tryIO' . removeTree . FP.decodeString))
+         $= CL.mapM_ (void . tryIO' . removeDirectoryRecursive))
 
     void (readProcessWithExitCode
               "ghc-pkg"
               ("unregister": flags ++ ["--force", unpack $ display name])
               "")
 
-    void $ tryIO' $ removeTree $ FP.decodeString $ docDir </> unpack (display ident)
+    void $ tryIO' $ removeDirectoryRecursive $ docDir </> unpack (display ident)
   where
     parseLibraryDir = fmap unpack . stripPrefix "library-dirs: "
 

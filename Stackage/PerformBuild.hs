@@ -16,8 +16,8 @@ module Stackage.PerformBuild
     , sdistFilePath
     ) where
 
-import           Control.Concurrent.Async    (forConcurrently_)
 import           Control.Monad.Writer.Strict (execWriter, tell)
+import           Control.Monad.STM (throwSTM)
 import qualified Data.ByteString             as S
 import           Data.Generics               (mkT, everywhere)
 import qualified Data.Map                    as Map
@@ -28,11 +28,10 @@ import           Distribution.Package        (Dependency (..))
 import           Distribution.PackageDescription.PrettyPrint (writeGenericPackageDescription)
 import           Distribution.Types.UnqualComponentName
 import           Distribution.Version        (anyVersion)
-import           Filesystem                  (canonicalizePath, createTree,
-                                              getWorkingDirectory,
-                                              removeTree, rename, removeFile)
-import           Filesystem.Path             (parent)
-import qualified Filesystem.Path.CurrentOS   as F
+import           System.Directory            (canonicalizePath, createDirectoryIfMissing,
+                                              getCurrentDirectory,
+                                              removeDirectoryRecursive, renameDirectory, removeFile)
+import qualified System.FilePath             as F
 import           Network.HTTP.Simple
 import           Stackage.BuildConstraints
 import           Stackage.BuildPlan
@@ -46,9 +45,7 @@ import qualified System.FilePath             as FP
 import           System.Environment          (getEnvironment)
 import           System.Exit
 import           System.IO                   (IOMode (WriteMode),
-                                              openBinaryFile, hFlush)
-import           System.IO.Temp              (withSystemTempDirectory, withSystemTempFile)
-import           System.Timeout              (timeout)
+                                              openBinaryFile)
 
 data BuildException = BuildException (Map PackageName BuildFailure) [Text]
     deriving Typeable
@@ -199,20 +196,20 @@ pbPrevResDir pb = pbInstallDest pb </> "prevres"
 
 performBuild :: PerformBuild -> IO [Text]
 performBuild pb = do
-    cwd <- getWorkingDirectory
+    cwd <- getCurrentDirectory
     performBuild' pb
-        { pbInstallDest = F.encodeString cwd </> pbInstallDest pb
-        , pbLogDir = F.encodeString cwd </> pbLogDir pb
+        { pbInstallDest = cwd </> pbInstallDest pb
+        , pbLogDir = cwd </> pbLogDir pb
         }
 
 performBuild' :: PerformBuild -> IO [Text]
 performBuild' pb@PerformBuild {..} = withBuildDir $ \builddir -> do
-    let removeTree' fp = whenM (doesDirectoryExist fp) (removeTree $ fromString fp)
-    removeTree' $ fromString pbLogDir
+    let removeTree' fp = whenM (doesDirectoryExist fp) (removeDirectoryRecursive fp)
+    removeTree' pbLogDir
 
     forM_ (pbDatabase pb) $ \db ->
         unlessM (doesFileExist $ db </> "package.cache") $ do
-            createTree $ parent $ fromString db
+            createDirectoryIfMissing True $ FP.takeDirectory db
             withCheckedProcess (proc "ghc-pkg" ["init", db])
                 $ \ClosedStream Inherited Inherited -> return ()
     pbLog $ encodeUtf8 "Copying built-in Haddocks\n"
@@ -427,7 +424,7 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
                 case mh of
                     Just h -> return h
                     Nothing -> mask_ $ do
-                        createTree $ parent $ fromString fp
+                        createDirectoryIfMissing True $ FP.takeDirectory fp
                         h <- openBinaryFile fp WriteMode
                         writeIORef ref $ Just h
                         return h
@@ -622,7 +619,7 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
                     Left e -> warn $ tshow e
                     Right newPath -> atomically
                                    $ modifyTVar sbHaddockFiles
-                                   $ insertMap namever (F.encodeString newPath)
+                                   $ insertMap namever newPath
 
             savePreviousResult pb Haddock pident $ either (const False) (const True) eres
             case (eres, pcHaddocks) of
@@ -755,7 +752,7 @@ maximumTestSuiteTime = 10 * 60 * 1000 * 1000 -- ten minutes
 
 renameOrCopy :: FilePath -> FilePath -> IO ()
 renameOrCopy src dest =
-    rename (fromString src) (fromString dest)
+    renameDirectory (fromString src) (fromString dest)
     `catchIO'` \_ -> copyDir src dest
 
 copyBuiltInHaddocks :: FilePath -> IO ()
@@ -768,8 +765,7 @@ copyBuiltInHaddocks docdir = do
             -- doc/ghc-8.0.1 (and so on). Let's put in a hacky trick
             -- to find the right directory.
 
-            let root = F.encodeString (parent (fromString ghc)) </>
-                            "../share/doc"
+            let root = FP.takeDirectory ghc </> "../share/doc"
             names <- getDirectoryContents root
             let hidden ('.':_) = True
                 hidden _ = False
@@ -784,7 +780,7 @@ copyBuiltInHaddocks docdir = do
                       ]
             src <- canonicalizePath $ fromString $
                 root </> name </> "html/libraries"
-            copyDir (F.encodeString src) docdir
+            copyDir src docdir
 
 ------------- Previous results
 
@@ -806,7 +802,7 @@ checkPrevResult PRFailure  _             = False
 
 withPRPath :: PerformBuild -> ResultType -> PackageIdentifier -> (FilePath -> IO a) -> IO a
 withPRPath pb rt ident inner = do
-    createTree $ parent $ fromString fp
+    createDirectoryIfMissing True $ FP.takeDirectory fp
     inner fp
   where
     fp = pbPrevResDir pb </> show rt </> unpack (display ident)

@@ -219,8 +219,10 @@ instance Show BadBuildPlan where
           $ display name
           : map (\err -> "    " ++ err) (toList errs)
 
-instance Monoid BadBuildPlan where
-    mempty = BadBuildPlan mempty mempty
-    mappend (BadBuildPlan a x) (BadBuildPlan b y) = BadBuildPlan
+instance Semigroup BadBuildPlan where
+    BadBuildPlan a x <> BadBuildPlan b y = BadBuildPlan
         (unionWith mappend a b)
         (unionWith mappend x y)
+instance Monoid BadBuildPlan where
+    mempty = BadBuildPlan mempty mempty
+    mappend = (<>)

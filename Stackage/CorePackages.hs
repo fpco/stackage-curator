@@ -12,8 +12,8 @@ module Stackage.CorePackages
 import           Control.Monad.State.Strict (StateT, execStateT, get, modify,
                                              put)
 import qualified Data.Map.Lazy              as Map
-import           Filesystem                 (listDirectory)
-import qualified Filesystem.Path.CurrentOS  as F
+import           System.Directory           (getDirectoryContents)
+import qualified System.FilePath            as F
 import           Stackage.Prelude
 import           System.Directory           (findExecutable)
 import           System.FilePath            (takeDirectory, takeFileName)
@@ -121,7 +121,7 @@ getCoreExecutables = do
         case mfp of
             Nothing -> error "No ghc executable found on PATH"
             Just fp -> return $ takeDirectory fp
-    (setFromList . map (ExeName . pack . takeFileName . F.encodeString)) <$> listDirectory (fromString dir)
+    (setFromList . map (ExeName . pack)) <$> getDirectoryContents dir
 
 getGhcVersion :: IO Version
 getGhcVersion = do

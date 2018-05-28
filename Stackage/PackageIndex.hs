@@ -24,6 +24,7 @@ module Stackage.PackageIndex
     ) where
 
 import qualified Codec.Archive.Tar                     as Tar
+import           Control.Monad.Catch (throwM)
 import           Data.Conduit.Lazy                     (MonadActive,
                                                         lazyConsume)
 import qualified Data.Text                             as T
@@ -242,7 +243,7 @@ gpdFromLBS fp lbs =
         Right gpd -> return gpd
 
 -- | Stream all of the cabal files from the 00-index tar file.
-sourcePackageIndex :: (MonadThrow m, MonadResource m, MonadActive m, MonadBaseControl IO m)
+sourcePackageIndex :: (MonadThrow m, MonadResource m, MonadActive m, MonadUnliftIO m)
                    => Producer m UnparsedCabalFile
 sourcePackageIndex = do
     fp <- getPackageIndexPath

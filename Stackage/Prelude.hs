@@ -9,6 +9,7 @@ module Stackage.Prelude
     ) where
 
 import           ClassyPrelude.Conduit           as X
+import           Control.Monad.Catch             as X (throwM)
 import           Data.Conduit.Process            as X
 import qualified Data.Map                        as Map
 import           Distribution.Package            as X (PackageIdentifier (..))
@@ -17,9 +18,8 @@ import           Distribution.Version            as X (Version, VersionRange)
 import           Distribution.Version            as X (withinRange, versionNumbers, mkVersion)
 import           Distribution.Types.PackageName  as X (PackageName, mkPackageName, unPackageName)
 import qualified Distribution.Version            as C
-import           Filesystem                      (createTree)
-import           Filesystem.Path                 (parent)
-import qualified Filesystem.Path.CurrentOS       as F
+import           System.FilePath                 as FP
+import           System.Directory                as D
 import Stackage.Types as X
 
 -- | There seems to be a bug in Cabal where serializing and deserializing
@@ -61,10 +61,10 @@ copyDir :: FilePath -> FilePath -> IO ()
 copyDir src dest =
     runResourceT $ sourceDirectoryDeep False src $$ mapM_C go
   where
-    src' = fromString src F.</> ""
-    go fp = forM_ (F.stripPrefix src' $ fromString fp) $ \suffix -> do
-        let dest' = dest </> F.encodeString suffix
-        liftIO $ createTree $ parent $ fromString dest'
+    src' = fromString src </> ""
+    go fp = forM_ (stripPrefix src' fp) $ \suffix -> do
+        let dest' = dest </> suffix
+        liftIO $ createDirectoryIfMissing True $ takeDirectory dest'
         sourceFile fp $$ (sinkFile dest' :: Sink ByteString (ResourceT IO) ())
 
 data Target = TargetNightly !Day

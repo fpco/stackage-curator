@@ -21,8 +21,8 @@ import qualified Codec.Archive.Tar.Entry   as Tar
 import qualified Codec.Compression.GZip    as GZip
 import qualified Data.Map                  as M
 import qualified Data.Yaml                 as Y
-import           Filesystem                (getWorkingDirectory, listDirectory)
-import qualified Filesystem.Path.CurrentOS as F
+import           System.Directory          (getCurrentDirectory, getDirectoryContents)
+import qualified System.FilePath           as F
 import           Foreign.C.Types           (CTime (CTime))
 import           Stackage.BuildConstraints
 import           Stackage.BuildPlan
@@ -144,13 +144,13 @@ createBundleV2 CreateBundleV2 {..} = do
     Y.encodeFile cb2DocmapFile docMap
     void $ writeIndexStyle Nothing cb2DocsDir
 
-    currentDir <- getWorkingDirectory
-    files <- listDirectory $ fromString docsDir
+    currentDir <- getCurrentDirectory
+    files <- getDirectoryContents docsDir
 
     let args = "cfJ"
-             : (F.encodeString currentDir </> cb2Dest)
+             : (currentDir </> cb2Dest)
              : "--dereference"
-             : map (takeFileName . F.encodeString) files
+             : files
         cp = (proc "tar" args) { cwd = Just docsDir }
     withCheckedProcess cp $ \ClosedStream Inherited Inherited -> return ()
 

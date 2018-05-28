@@ -19,7 +19,6 @@ import           Stackage.BuildPlan
 import           Stackage.CheckBuildPlan
 import           Stackage.PerformBuild
 import           Stackage.Prelude
-import           System.IO                 (BufferMode (LineBuffering), hSetBuffering)
 
 -- | Flags passed in from the command line.
 data InstallFlags = InstallFlags
