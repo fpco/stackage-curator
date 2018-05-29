@@ -62,7 +62,7 @@ copyDir src dest =
     runResourceT $ sourceDirectoryDeep False src $$ mapM_C go
   where
     src' = fromString src </> ""
-    go fp = forM_ (stripPrefix src' fp) $ \suffix -> do
+    go fp = forM_ (stripDirPrefix src' fp) $ \suffix -> do
         let dest' = dest </> suffix
         liftIO $ createDirectoryIfMissing True $ takeDirectory dest'
         sourceFile fp $$ (sinkFile dest' :: Sink ByteString (ResourceT IO) ())
@@ -74,3 +74,6 @@ data Target = TargetNightly !Day
 targetSlug :: Target -> Text
 targetSlug (TargetNightly day) = "nightly-" ++ tshow day
 targetSlug (TargetLts x y) = concat ["lts-", tshow x, ".", tshow y]
+
+stripDirPrefix :: FilePath -> FilePath -> Maybe FilePath
+stripDirPrefix pref path = stripPrefix (FP.addTrailingPathSeparator pref) path

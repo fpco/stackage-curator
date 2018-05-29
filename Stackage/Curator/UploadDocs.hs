@@ -158,7 +158,7 @@ upload' toCompress name src = do
 
 isHoogleFile :: FilePath -> FilePath -> Bool
 isHoogleFile input fp' = fromMaybe False $ do
-    fp <- stripPrefix (input F.</> "") fp'
+    fp <- stripDirPrefix input fp'
     [dir, name] <- Just $ F.splitDirectories fp
     pkgver <- stripSuffix "/" $ pack dir
     (pack -> pkg, ".txt") <- Just $ F.splitExtensions name
@@ -190,7 +190,7 @@ go input name fp
     | any (\ext -> F.takeExtension fp == ('.':ext)) $ words "css js png gif" = void $ getName fp
     | otherwise = upload' True key $ sourceFile fp
   where
-    Just suffix = stripPrefix (input F.</> "") fp
+    Just suffix = stripDirPrefix input fp
     toRoot = concat $ asList $ replicate (length $ F.splitDirectories suffix) $ asText "../"
     key = name ++ "/" ++ pack suffix
     packageUrl = concat
