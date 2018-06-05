@@ -157,8 +157,7 @@ upload' toCompress name src = do
 isHoogleFile :: FilePath -> FilePath -> Bool
 isHoogleFile input fp' = fromMaybe False $ do
     fp <- stripDirPrefix input fp'
-    [dir, name] <- Just $ F.splitDirectories fp
-    pkgver <- stripSuffix "/" $ pack dir
+    [pkgver, name] <- Just $ F.splitDirectories fp
     (pack -> pkg, ".txt") <- Just $ F.splitExtensions name
     PackageIdentifier pkg1 _ver <- simpleParse pkgver
     pkg2 <- simpleParse pkg
