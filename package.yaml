@@ -1,0 +1,118 @@
+name:                stackage-curator
+version:             0.16.0.0
+synopsis:            Tools for curating Stackage bundles
+description:         Please see <http://www.stackage.org/package/stackage-curator> for a description and documentation.
+github:              fpco/stackage-curator
+license:             MIT
+license-file:        LICENSE
+author:              Michael Snoyman
+maintainer:          michael@fpcomplete.com
+category:            Distribution
+
+extra-source-files:
+- README.md
+- ChangeLog.md
+- test/test-build-constraints.yaml
+
+dependencies:
+- base >= 4 && < 5
+- containers
+- Cabal >= 2.2 && < 2.3
+- tar >= 0.3
+- zlib
+- bytestring
+- directory
+- filepath
+- transformers
+- process
+- old-locale
+- time
+- utf8-string
+
+- conduit-extra
+- classy-prelude-conduit >= 1
+- text
+- mtl
+- aeson
+- yaml
+- unix-compat
+- http-client >= 0.5
+- http-conduit
+- http-client-tls
+- temporary
+- data-default-class
+- stm
+- mono-traversable
+- async
+- streaming-commons >= 0.1.7.1
+- semigroups
+- xml-conduit
+- conduit
+
+- blaze-html
+- html-conduit
+- mime-types
+- amazonka >= 1.4.5
+- amazonka-s3
+- amazonka-core
+- xml-types
+- cryptonite
+- cryptonite-conduit
+- memory
+- resourcet
+- lucid
+- store
+- syb
+- safe
+- vector
+- exceptions
+- unordered-containers
+- hashable
+
+library:
+  source-dirs:   src
+  other-modules: Control.Monad.Trans.RWS.Ref
+
+executables:
+  stackage-curator:
+    source-dirs:      app
+    main:             stackage.hs
+    dependencies:
+    - stackage-curator
+    - optparse-applicative >= 0.11
+    - optparse-simple
+    - http-client
+    - http-client-tls
+    - text
+
+    ghc-options:
+    - -rtsopts
+    - -threaded
+    - -with-rtsopts=-N
+
+  stackage-build-plan:
+    main:               stackage-build-plan.hs
+    source-dirs:      app
+    dependencies:
+    - stackage-curator
+    - optparse-applicative
+    - optparse-simple
+    - text
+    - aeson >= 1
+
+tests:
+  spec:
+    source-dirs:      test
+    main:             Spec.hs
+    dependencies:
+    - stackage-curator
+    - hspec
+    - QuickCheck
+    - text
+    - classy-prelude-conduit
+    - Cabal
+    - yaml
+    - containers
+    - http-client
+    - http-client-tls
+    - directory
