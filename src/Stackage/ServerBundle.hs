@@ -4,9 +4,7 @@
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE FlexibleContexts  #-}
 module Stackage.ServerBundle
-    ( serverBundle
-    , epochTime
-    , bpAllPackages
+    ( bpAllPackages
     , docsListing
     , createBundleV2
     , CreateBundleV2 (..)
@@ -16,25 +14,14 @@ module Stackage.ServerBundle
     , PackageDocs (..)
     ) where
 
-import qualified Codec.Archive.Tar         as Tar
-import qualified Codec.Archive.Tar.Entry   as Tar
-import qualified Codec.Compression.GZip    as GZip
-import qualified Data.Map                  as M
 import qualified Data.Yaml                 as Y
-import           System.Directory          (getCurrentDirectory, getDirectoryContents)
-import           Foreign.C.Types           (CTime (CTime))
 import           Stackage.BuildConstraints
 import           Stackage.BuildPlan
 import           Stackage.Prelude
-import qualified System.PosixCompat.Time   as PC
 import qualified Text.XML                  as X
 import           Text.XML.Cursor
 import System.Directory (canonicalizePath, doesDirectoryExist, doesFileExist)
 import System.FilePath (takeFileName)
-
--- | Get current time
-epochTime :: IO Tar.EpochTime
-epochTime = (\(CTime t) -> fromIntegral t) <$> PC.epochTime
 
 -- | All package/versions in a build plan, including core packages.
 --
@@ -42,45 +29,6 @@ epochTime = (\(CTime t) -> fromIntegral t) <$> PC.epochTime
 bpAllPackages :: BuildPlan -> Map PackageName Version
 bpAllPackages BuildPlan {..} =
     siCorePackages bpSystemInfo ++ map ppVersion bpPackages
-
-serverBundle :: Tar.EpochTime
-             -> Text -- ^ title
-             -> Text -- ^ slug
-             -> BuildPlan
-             -> LByteString
-serverBundle time title slug bp@BuildPlan {..} = GZip.compress $ Tar.write
-    [ fe "build-plan.yaml" (fromStrict $ Y.encode bp)
-    , fe "hackage" hackage
-    , fe "slug" (fromStrict $ encodeUtf8 slug)
-    , fe "desc" (fromStrict $ encodeUtf8 title)
-    , fe "core" corePackagesList
-    ]
-  where
-    fe name contents =
-        case Tar.toTarPath False name of
-            Left s -> error s
-            Right name' -> (Tar.fileEntry name' contents)
-                { Tar.entryTime = time
-                }
-    hackage = builderToLazy $ foldMap goPair $ mapToList packageMap
-
-    -- need to remove some packages that don't exist on Hackage
-    packageMap = foldr deleteMap (bpAllPackages bp) $ map mkPackageName
-        [ "bin-package-db"
-        , "ghc"
-        , "rts"
-        ]
-
-    goPair (name, version) =
-        toBuilder (display name) ++
-        toBuilder (asText "-") ++
-        toBuilder (display version) ++
-        toBuilder (asText "\n")
-
-    corePackagesList =
-        builderToLazy $ toBuilder $ unlines $
-            map unPackageName
-                (M.keys $ siCorePackages bpSystemInfo)
 
 docsListing :: BuildPlan
             -> FilePath -- ^ docs directory
@@ -126,7 +74,6 @@ data CreateBundleV2 = CreateBundleV2
     { cb2Plan :: BuildPlan
     , cb2Type :: SnapshotType
     , cb2DocsDir :: FilePath
-    , cb2Dest :: FilePath
     , cb2DocmapFile :: !FilePath
     }
 
@@ -142,16 +89,6 @@ createBundleV2 CreateBundleV2 {..} = do
     Y.encodeFile (docsDir </> "docs-map.yaml") docMap
     Y.encodeFile cb2DocmapFile docMap
     void $ writeIndexStyle Nothing cb2DocsDir
-
-    currentDir <- getCurrentDirectory
-    files <- getDirectoryContents docsDir
-
-    let args = "cfJ"
-             : (currentDir </> cb2Dest)
-             : "--dereference"
-             : files
-        cp = (proc "tar" args) { cwd = Just docsDir }
-    withCheckedProcess cp $ \ClosedStream Inherited Inherited -> return ()
 
 writeIndexStyle :: Maybe Text -- ^ snapshot id
                 -> FilePath -- ^ docs dir

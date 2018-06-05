@@ -76,11 +76,10 @@ upload toCompress env' bucket name = do
 
 -- | Uses 'newEnv' for S3 credentials.
 uploadDocs :: FilePath -- ^ directory containing docs
-           -> FilePath -- ^ the bundle file
            -> Text -- ^ name of current docs, used as prefix in object names
            -> Text -- ^ bucket name
            -> IO ()
-uploadDocs input' bundleFile name bucket = do
+uploadDocs input' name bucket = do
     env' <- newEnv Discover
 
     unlessM (Dir.doesDirectoryExist input') $ error $ "Could not find directory: " ++ show input'
@@ -117,9 +116,9 @@ uploadDocs input' bundleFile name bucket = do
         ((), _, hoogles) <- runRWSRefT inner (env', bucket) mempty
 
         lbs <- liftIO $ fmap Tar.write $ mapM toEntry $ toList hoogles
-        flip runReaderT (env', bucket) $ do
-            upload' True (name ++ "/hoogle/orig.tar") $ sourceLazy lbs
-            upload' False (name ++ "/bundle.tar.xz") $ sourceFile bundleFile
+        runReaderT
+            (upload' True (name ++ "/hoogle/orig.tar") $ sourceLazy lbs)
+            (env', bucket)
 
 -- | Create a TAR entry for each Hoogle txt file. Unfortunately doesn't stream.
 toEntry :: FilePath -> IO Tar.Entry

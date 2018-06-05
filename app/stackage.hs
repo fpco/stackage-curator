@@ -64,14 +64,13 @@ main = do
                 <*> pure (T.pack "haddock.stackage.org")
                 <*> pure (T.pack "package-index/"))
         addCommand "upload-docs" "Upload documentation to an S3 bucket" id
-            (uploadDocs' <$> target <*> bundleFile)
+            (uploadDocs' <$> target)
         addCommand "list-revdeps" "List reverse dependencies" id
             (listRevDeps <$> planFile <*> deepRevDeps <*> revDepPackage)
 
     makeBundle' = makeBundle
         <$> planFile
         <*> docmapFile
-        <*> bundleFile
         <*> target
         <*> jobs
         <*> skipTests
@@ -251,12 +250,6 @@ main = do
     planFileArg = strArgument
          ( metavar "YAML-FILE"
         ++ help "YAML file containing a build plan"
-         )
-
-    bundleFile = strOption
-         ( metavar "BUNDLE-FILE"
-        ++ long "bundle-file"
-        ++ help "Path to bundle file"
          )
 
     constraint =

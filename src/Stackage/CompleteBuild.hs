@@ -271,17 +271,14 @@ uploadGithub planFile docmapFile target = do
     git ["commit", "-m", "Checking in " ++ (takeFileName $ dropExtension $ fromString destFPPlan)]
     git ["push", "origin", "HEAD:master"]
 
-uploadDocs' :: Target
-            -> FilePath -- ^ bundle file
-            -> IO ()
-uploadDocs' target bundleFile = do
+uploadDocs' :: Target -> IO ()
+uploadDocs' target = do
     name <-
         case target of
             TargetNightly day -> return $ "nightly-" ++ tshow day
             TargetLts x y -> return $ concat ["lts-", tshow x, ".", tshow y]
     uploadDocs
         (installDest target </> "doc")
-        bundleFile
         name
         "haddock.stackage.org"
 
@@ -294,7 +291,6 @@ installDest target =
 makeBundle
     :: FilePath -- ^ plan file
     -> FilePath -- ^ docmap file
-    -> FilePath -- ^ bundle file
     -> Target
     -> Maybe Int -- ^ jobs
     -> Bool -- ^ skip tests?
@@ -309,7 +305,7 @@ makeBundle
     -> Bool -- ^ cabal from head?
     -> IO ()
 makeBundle
-  planFile docmapFile bundleFile target mjobs skipTests skipBenches skipHaddocks skipHoogle
+  planFile docmapFile target mjobs skipTests skipBenches skipHaddocks skipHoogle
   enableLibraryProfiling enableExecutableDynamic verbose allowNewer
   noRebuildCabal cabalFromHead
         = do
@@ -340,7 +336,6 @@ makeBundle
     putStrLn "Performing build"
     performBuild pb >>= mapM_ putStrLn
 
-    putStrLn $ "Creating bundle (v2) at: " ++ pack bundleFile
     createBundleV2 CreateBundleV2
         { cb2Plan = plan
         , cb2Type =
@@ -348,7 +343,6 @@ makeBundle
                 TargetNightly day -> STNightly2 day
                 TargetLts x y -> STLTS x y
         , cb2DocsDir = pbDocDir pb
-        , cb2Dest = bundleFile
         , cb2DocmapFile = docmapFile
         }
 
