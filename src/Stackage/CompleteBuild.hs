@@ -12,7 +12,6 @@ module Stackage.CompleteBuild
     , createPlan
     , fetch
     , makeBundle
-    , upload
     , hackageDistro
     , uploadGithub
     , uploadDocs'
@@ -52,7 +51,6 @@ data BuildFlags = BuildFlags
     , bfEnableExecDyn    :: !Bool
     , bfVerbose          :: !Bool
     , bfSkipCheck        :: !Bool
-    , bfServer           :: !StackageServer
     , bfBuildHoogle      :: !Bool
     , bfBundleDest       :: !(Maybe FilePath)
     , bfGitPush          :: !Bool
@@ -272,23 +270,6 @@ uploadGithub planFile docmapFile target = do
     git ["add", destFPPlan, destFPDocmap]
     git ["commit", "-m", "Checking in " ++ (takeFileName $ dropExtension $ fromString destFPPlan)]
     git ["push", "origin", "HEAD:master"]
-
-upload
-    :: FilePath -- ^ bundle file
-    -> StackageServer -- ^ server URL
-    -> IO ()
-upload bundleFile server = do
-    man <- newManager tlsManagerSettings
-    putStrLn "Uploading bundle to Stackage Server"
-
-    token <- getStackageAuthToken
-
-    res <- flip uploadBundleV2 man UploadBundleV2
-        { ub2Server = server
-        , ub2AuthToken = token
-        , ub2Bundle = bundleFile
-        }
-    putStrLn $ "New snapshot available at: " ++ res
 
 uploadDocs' :: Target
             -> FilePath -- ^ bundle file

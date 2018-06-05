@@ -15,8 +15,6 @@ import           Stackage.DiffPlans
 import           Stackage.InstallBuild
 import           Stackage.Prelude             hiding ((<>))
 import           Stackage.Stats
-import           Stackage.Upload
-import           System.Exit                  (exitWith)
 import           Data.Monoid                  ((<>))
 
 main :: IO ()
@@ -30,10 +28,6 @@ main = do
         commands
   where
     commands = do
-        addCommand "update" "DEPRECATED use stack update instead" id
-            (pure $ do
-                putStrLn $ pack "Deprecated, use 'stack update' directly instead"
-                rawSystem "stack" ["update"] >>= exitWith)
         addCommand "create-plan" "Generate a new plan file (possibly based on a previous LTS)" id
             (createPlan
                 <$> target
@@ -52,8 +46,6 @@ main = do
             makeBundle'
         addCommand "check-target-available" "Is the given target available to be used?" id
             (checkTargetAvailable <$> target)
-        addCommand "upload" "Upload a bundle to Stackage Server" id
-            (upload <$> bundleFile <*> stackageServer)
         addCommand "hackage-distro" "Update the Hackage distro list" id
             (hackageDistro <$> planFile <*> target)
         addCommand "upload-github" "Upload a plan to the relevant Github repo" id
@@ -266,13 +258,6 @@ main = do
         ++ long "bundle-file"
         ++ help "Path to bundle file"
          )
-
-    stackageServer =
-        (fmap fromString (strOption
-            (long "server-url" ++
-             metavar "SERVER-URL" ++
-             showDefault ++ value (T.unpack $ unStackageServer def) ++
-             help "Server to upload bundle to")))
 
     constraint =
         option constraintRead

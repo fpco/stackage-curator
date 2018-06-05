@@ -1,3 +1,7 @@
+## 0.17.0.0
+
+* Code cleanup, remove deprecated commands
+
 ## 0.16.0.0
 
 * Use Cabal.Simple.BuildToolDepends.getAllToolDependencies to compute the tools field of SimpleDesc [#52](https://github.com/fpco/stackage-curator/issues/52)
