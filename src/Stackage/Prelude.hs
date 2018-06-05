@@ -59,13 +59,13 @@ instance (Show key, Typeable key) => Exception (TopologicalSortException key)
 
 copyDir :: FilePath -> FilePath -> IO ()
 copyDir src dest =
-    runResourceT $ sourceDirectoryDeep False src $$ mapM_C go
+    runConduitRes $ sourceDirectoryDeep False src .| mapM_C go
   where
     src' = fromString src </> ""
     go fp = forM_ (stripDirPrefix src' fp) $ \suffix -> do
         let dest' = dest </> suffix
         liftIO $ createDirectoryIfMissing True $ takeDirectory dest'
-        sourceFile fp $$ (sinkFile dest' :: Sink ByteString (ResourceT IO) ())
+        runConduit $ sourceFile fp .| sinkFile dest'
 
 data Target = TargetNightly !Day
             | TargetLts !Int !Int

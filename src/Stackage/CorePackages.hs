@@ -13,10 +13,9 @@ import           Control.Monad.State.Strict (StateT, execStateT, get, modify,
                                              put)
 import qualified Data.Map.Lazy              as Map
 import           System.Directory           (getDirectoryContents)
-import qualified System.FilePath            as F
 import           Stackage.Prelude
 import           System.Directory           (findExecutable)
-import           System.FilePath            (takeDirectory, takeFileName)
+import           System.FilePath            (takeDirectory)
 
 addDeepDepends :: PackageName -> StateT (Map PackageName Version) IO ()
 addDeepDepends name@(unPackageName -> name') = do
@@ -32,8 +31,8 @@ addDeepDepends name@(unPackageName -> name') = do
             put $ Map.insert name (error "Version prematurely forced") m
             let cp = proc "ghc-pkg" ["--no-user-package-conf", "describe", name']
             version <- withCheckedProcess cp $ \ClosedStream src Inherited ->
-                src $$ decodeUtf8C =$ linesUnboundedC =$ getZipSink (
-                       ZipSink (dependsConduit =$ dependsSink)
+                runConduit $ src .| decodeUtf8C .| linesUnboundedC .| getZipSink (
+                       ZipSink (dependsConduit .| dependsSink)
                     *> ZipSink versionSink)
             modify $ insertMap name version
   where
@@ -54,7 +53,7 @@ addDeepDepends name@(unPackageName -> name') = do
     -- of GHC.
     dependsConduit = do
        dropWhileC $ not . ("depends:" `isPrefixOf`)
-       takeWhileC isGood =$= concatMapC sanitize
+       takeWhileC isGood .| concatMapC sanitize
       where
         -- GHC 7.8 puts a package on the first line with "depends:", GHC 7.10
         -- does not. We want to take all lines that have a dependency and then
@@ -127,4 +126,4 @@ getGhcVersion :: IO Version
 getGhcVersion = do
     withCheckedProcess (proc "ghc" ["--numeric-version"]) $
         \ClosedStream src Inherited ->
-            (src $$ decodeUtf8C =$ foldC) >>= simpleParse
+            (runConduit $ src .| decodeUtf8C .| foldC) >>= simpleParse

@@ -22,7 +22,6 @@ import qualified Codec.Compression.GZip    as GZip
 import qualified Data.Map                  as M
 import qualified Data.Yaml                 as Y
 import           System.Directory          (getCurrentDirectory, getDirectoryContents)
-import qualified System.FilePath           as F
 import           Foreign.C.Types           (CTime (CTime))
 import           Stackage.BuildConstraints
 import           Stackage.BuildPlan
@@ -159,11 +158,11 @@ writeIndexStyle :: Maybe Text -- ^ snapshot id
                 -> IO [String]
 writeIndexStyle msnapid dir = do
     dirs <- fmap sort
-          $ runResourceT
+          $ runConduitRes
           $ sourceDirectory dir
-         $$ filterMC (liftIO . doesDirectoryExist)
-         =$ mapC takeFileName
-         =$ sinkList
+         .| filterMC (liftIO . doesDirectoryExist)
+         .| mapC takeFileName
+         .| sinkList
     writeFile (dir </> "index.html") $ encodeUtf8 $ asText $ pack $ mkIndex
         (unpack <$> msnapid)
         dirs

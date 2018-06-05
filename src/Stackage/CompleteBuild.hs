@@ -23,7 +23,6 @@ import System.Directory (getAppUserDataDirectory, createDirectoryIfMissing, does
 import System.FilePath (takeDirectory)
 import Distribution.Package (Dependency)
 import Control.Concurrent        (threadDelay, getNumCapabilities)
-import Control.Concurrent.Async  (withAsync)
 import Data.Yaml                 (decodeFileEither, encodeFile, decodeEither')
 import Network.HTTP.Client
 import Network.HTTP.Client.Conduit (bodyReaderSource)
@@ -32,17 +31,16 @@ import Stackage.BuildConstraints
 import Stackage.BuildPlan
 import Stackage.CheckBuildPlan
 import Stackage.PerformBuild
-import Stackage.Prelude          hiding (threadDelay, getNumCapabilities, Concurrently (..), withAsync)
+import Stackage.Prelude
 import Stackage.ServerBundle
 import Stackage.UpdateBuildPlan
 import Stackage.Upload
 import System.Environment        (lookupEnv)
 import System.FilePath           (dropExtension, takeFileName)
 import Data.Function (fix)
-import Control.Concurrent.Async (Concurrently (..))
 import Stackage.Curator.UploadDocs (uploadDocs)
 import Stackage.PackageIndex (getAllCabalHashesCommit)
-import System.Directory (doesDirectoryExist, doesFileExist)
+import System.Directory (doesDirectoryExist)
 
 -- | Flags passed in from the command line.
 data BuildFlags = BuildFlags
@@ -170,108 +168,12 @@ checkPlan mfp = stillAlive $ do
 
     putStrLn "Plan seems valid!"
 
-{- FIXME remove
-getPerformBuild :: BuildFlags -> Settings -> IO PerformBuild
-getPerformBuild buildFlags Settings {..} = do
-    jobs <- maybe getNumCapabilities return $ bfJobs buildFlags
-    return PerformBuild
-        { pbPlan = plan
-        , pbInstallDest = buildDir
-        , pbLogDir = logDir
-        , pbLog = hPut stdout
-        , pbJobs = jobs
-        , pbGlobalInstall = False
-        , pbEnableTests = bfEnableTests buildFlags
-        , pbEnableHaddock = bfEnableHaddock buildFlags
-        , pbEnableLibProfiling = bfEnableLibProfile buildFlags
-        , pbEnableExecDyn = bfEnableExecDyn buildFlags
-        , pbVerbose = bfVerbose buildFlags
-        , pbAllowNewer = bfSkipCheck buildFlags
-        , pbBuildHoogle = bfBuildHoogle buildFlags
-        }
-
--- | Make a complete plan, build, test and upload bundle, docs and
--- distro.
-completeBuild :: BuildType -> BuildFlags -> IO ()
-completeBuild buildType buildFlags = do
-    man <- newManager tlsManagerSettings
-    hSetBuffering stdout LineBuffering
-
-    settings@Settings {..} <- if bfLoadPlan buildFlags
-        then
-            case bfPlanFile buildFlags of
-                Nothing -> error "When loading plan, plan file must be specified"
-                Just file -> do
-                    putStrLn $ "Loading build plan from: " ++ fpToText file
-                    getSettings man buildFlags buildType $ Just file
-        else do
-            putStrLn $ "Loading settings for: " ++ tshow buildType
-            settings@Settings {..} <- getSettings man buildFlags buildType Nothing
-
-            putStrLn $ "Writing build plan to: " ++ fpToText planFile
-            encodeFile planFile plan
-
-            if bfSkipCheck buildFlags
-                then putStrLn "Skipping build plan check"
-                else do
-                    putStrLn "Checking build plan"
-                    checkBuildPlan plan
-
-            return settings
-
-    pb <- getPerformBuild buildFlags settings
-
-    if bfPreBuild buildFlags
-        then prefetchPackages pb
-        else do
-            putStrLn "Performing build"
-            performBuild pb >>= mapM_ putStrLn
-
-            putStrLn $ "Creating bundle (v2) at: " ++ fpToText bundleDest
-            createBundleV2 CreateBundleV2
-                { cb2Plan = plan
-                , cb2Type = snapshotType
-                , cb2DocsDir = pbDocDir pb
-                , cb2Dest = bundleDest
-                }
-
-            postBuild `catchAny` print
-
-            when (bfDoUpload buildFlags) $
-                finallyUpload
-                    buildFlags
-                    settings
-                    man
--}
-
 getStackageAuthToken :: IO Text
 getStackageAuthToken = do
     mtoken <- lookupEnv "STACKAGE_AUTH_TOKEN"
     case mtoken of
         Nothing -> decodeUtf8 <$> readFile "/auth-token"
         Just token -> return $ pack token
-
-{- FIXME remove
--- | The final part of the complete build process: uploading a bundle,
--- docs and a distro to hackage.
-finallyUpload :: BuildFlags
-              -> Settings -> Manager -> IO ()
-finallyUpload buildFlags settings@Settings{..} man = do
-    let server = bfServer buildFlags
-    pb <- getPerformBuild buildFlags settings
-
-    putStrLn "Uploading bundle to Stackage Server"
-
-    token <- getStackageAuthToken
-
-    res <- flip uploadBundleV2 man UploadBundleV2
-        { ub2Server = server
-        , ub2AuthToken = token
-        , ub2Bundle = bundleDest
-        }
-    putStrLn $ "New snapshot available at: " ++ res
-
--}
 
 hackageDistro
     :: FilePath -- ^ plan file
@@ -363,9 +265,9 @@ uploadGithub planFile docmapFile target = do
     (git, destFPPlan, destFPDocmap) <- checkoutRepo target
 
     createDirectoryIfMissing True $ takeDirectory destFPDocmap
-    runResourceT $ do
-        sourceFile planFile $$ (sinkFile destFPPlan :: Sink ByteString (ResourceT IO) ())
-        sourceFile docmapFile $$ (sinkFile destFPDocmap :: Sink ByteString (ResourceT IO) ())
+    runConduitRes $ do
+        sourceFile planFile .| sinkFile destFPPlan
+        sourceFile docmapFile .| sinkFile destFPDocmap
 
     git ["add", destFPPlan, destFPDocmap]
     git ["commit", "-m", "Checking in " ++ (takeFileName $ dropExtension $ fromString destFPPlan)]
@@ -494,7 +396,7 @@ fetch planFile = do
             req <- parseUrlThrow url
             withResponse req man $ \res -> do
                 let tmp = fp <.> "tmp"
-                runResourceT $ bodyReaderSource (responseBody res) $$ sinkFile tmp
+                runConduitRes $ bodyReaderSource (responseBody res) .| sinkFile tmp
                 renameFile (fromString tmp) fp
       where
         url = unpack $ concat

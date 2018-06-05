@@ -32,15 +32,15 @@ uploadIndex bpFile target bucket prefix = do
     runResourceT $ do
         entries <- lazyConsume
             $  sourcePackageIndex
-            $= filterC toInclude
-            $= mapC ucfEntry
+            .| filterC toInclude
+            .| mapC ucfEntry
         let lbs = compress $ Tar.write entries
             key = concat
                 [ prefix
                 , targetSlug target
                 , ".tar.gz"
                 ]
-        sourceLazy lbs $$ upload False env bucket key
+        runConduit $ sourceLazy lbs .| upload False env bucket key
 
 getToInclude :: BuildPlan -> UnparsedCabalFile -> Bool
 getToInclude bp =

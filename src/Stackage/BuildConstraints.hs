@@ -21,7 +21,6 @@ module Stackage.BuildConstraints
 import           Control.Monad.Writer.Strict (execWriter, tell)
 import           Data.Aeson
 import           Data.Aeson.Internal         ((<?>), JSONPathElement (Key))
-import           Data.Char                   (isLower)
 import qualified Data.Map                    as Map
 import qualified Data.Set                    as Set
 import           Data.Yaml                   (decodeEither', decodeFileEither)

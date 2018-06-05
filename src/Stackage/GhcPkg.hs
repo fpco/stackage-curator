@@ -15,7 +15,6 @@ import qualified Data.Text as T
 import           Distribution.Compat.ReadP
 import           Distribution.Package
 import           Distribution.Text (parse)
-import qualified System.FilePath as FP
 import Stackage.Prelude
 import System.Directory (removeDirectoryRecursive)
 
@@ -55,7 +54,7 @@ getBrokenPackages flags = do
                   (proc
                        "ghc-pkg"
                        ("check" : "--simple-output" : flags))
-                  (CT.decodeUtf8 $= CT.lines $= CL.consume)
+                  (CT.decodeUtf8 .| CT.lines .| CL.consume)
     return (mapMaybe parsePackageIdent (T.words (T.unlines ps)))
 
 -- | Get available packages.
@@ -65,7 +64,7 @@ getRegisteredPackages flags = do
                   (proc
                        "ghc-pkg"
                        ("list" : "--simple-output" : flags))
-                  (CT.decodeUtf8 $= CT.lines $= CL.consume)
+                  (CT.decodeUtf8 .| CT.lines .| CL.consume)
     return (mapMaybe parsePackageIdent (T.words (T.unlines ps)))
 
 -- | Parse a package identifier: foo-1.2.3
@@ -88,9 +87,9 @@ unregisterPackage log' onUnregister docDir flags ident@(PackageIdentifier name _
     (_exitCode, ()) <- sourceProcessWithConsumer
         (proc "ghc-pkg" ("describe" : flags ++ [unpack $ display ident]))
         (CT.decodeUtf8
-         $= CT.lines
-         $= CL.mapMaybe parseLibraryDir
-         $= CL.mapM_ (void . tryIO' . removeDirectoryRecursive))
+         .| CT.lines
+         .| CL.mapMaybe parseLibraryDir
+         .| CL.mapM_ (void . tryIO' . removeDirectoryRecursive))
 
     void (readProcessWithExitCode
               "ghc-pkg"

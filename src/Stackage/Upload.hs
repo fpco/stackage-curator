@@ -82,14 +82,14 @@ uploadBundleV2 UploadBundleV2 {..} man = IO.withBinaryFile ub2Bundle IO.ReadMode
                 , ("Content-Type", "application/x-tar")
                 ]
             , requestBody = HCC.requestBodySource (fromIntegral size)
-                          $ sourceHandle h $= printProgress size
+                          $ sourceHandle h .| printProgress size
             }
-        sink = decodeUtf8C =$ fix (\loop -> do
+        sink = decodeUtf8C .| fix (\loop -> do
             mx <- peekC
             case mx of
                 Nothing -> error $ "uploadBundleV2: premature end of stream"
                 Just _ -> do
-                    l <- lineC $ takeCE 4096 =$ foldC
+                    l <- lineC $ takeCE 4096 .| foldC
                     let (cmd, msg') = break (== ':') l
                         msg = dropWhile (== ' ') $ dropWhile (== ':') msg'
                     case cmd of
@@ -100,7 +100,7 @@ uploadBundleV2 UploadBundleV2 {..} man = IO.withBinaryFile ub2Bundle IO.ReadMode
                         "SUCCESS" -> return msg
                         _ -> error $ "uploadBundleV2: unknown command " ++ unpack cmd
             )
-    withResponse req2 man $ \res -> HCC.bodyReaderSource (responseBody res) $$ sink
+    withResponse req2 man $ \res -> runConduit $ HCC.bodyReaderSource (responseBody res) .| sink
   where
     printProgress total =
         loop 0 0

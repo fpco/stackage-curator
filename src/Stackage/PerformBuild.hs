@@ -31,7 +31,6 @@ import           Distribution.Version        (anyVersion)
 import           System.Directory            (canonicalizePath, createDirectoryIfMissing,
                                               getCurrentDirectory,
                                               removeDirectoryRecursive, renameDirectory, removeFile)
-import qualified System.FilePath             as F
 import           Network.HTTP.Simple
 import           Stackage.BuildConstraints
 import           Stackage.BuildPlan
@@ -40,7 +39,6 @@ import           Stackage.PackageDescription
 import           Stackage.PackageIndex       (gpdFromLBS)
 import           Stackage.Prelude            hiding (pi)
 import           System.Directory            (doesDirectoryExist, doesFileExist, findExecutable, getDirectoryContents)
-import qualified System.Directory
 import qualified System.FilePath             as FP
 import           System.Environment          (getEnvironment)
 import           System.Exit
@@ -353,8 +351,8 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
         [ namever
         , fromMaybe (assert False "") $ do
             cfi <- ppCabalFileInfo $ piPlan sbPackageInfo
-            hash <- lookup "SHA256" $ cfiHashes cfi
-            Just $ "@sha256:" ++ hash
+            hash' <- lookup "SHA256" $ cfiHashes cfi
+            Just $ "@sha256:" ++ hash'
         ]
 
     quote :: Text -> Text
@@ -820,11 +818,11 @@ getAllPreviousResults pb = do
     go rt = do
         exists <- doesDirectoryExist dir
         allResults <- if exists then
-               runResourceT
+               runConduitRes
              $ sourceDirectory dir
-            $$ filterMC (liftIO . doesFileExist)
-            =$ mapMC (liftIO . toMap)
-            =$ foldlC (unionWith union) mempty
+            .| filterMC (liftIO . doesFileExist)
+            .| mapMC (liftIO . toMap)
+            .| foldlC (unionWith union) mempty
             else return mempty
         fmap concat $ mapM (uncurry removeDupes) $ mapToList allResults
       where
@@ -868,11 +866,11 @@ getPreviousResult w x y = withPRPath w x y $ \fp -> do
 removePreviousResults :: PerformBuild -> ResultType -> PackageName -> IO ()
 removePreviousResults pb rt name =
           whenM (doesDirectoryExist dir)
-        $ runResourceT
+        $ runConduitRes
         $ sourceDirectory dir
-       $$ filterC isOurPackage
-       =$ filterMC (liftIO . doesFileExist)
-       =$ mapM_C (liftIO . System.Directory.removeFile)
+       .| filterC isOurPackage
+       .| filterMC (liftIO . doesFileExist)
+       .| mapM_C (liftIO . System.Directory.removeFile)
   where
     dir = pbPrevResDir pb </> show rt
     prefix = display name ++ "-"
@@ -897,9 +895,9 @@ deletePreviousResults pb name =
 -- | Discover existing .haddock files in the docs directory
 getHaddockFiles :: PerformBuild -> IO (Map Text FilePath)
 getHaddockFiles pb =
-      runResourceT
+      runConduitRes
     $ sourceDirectory (pbDocDir pb)
-   $$ foldMapMC (liftIO . go)
+   .| foldMapMC (liftIO . go)
   where
     go :: FilePath -> IO (Map Text FilePath)
     go dir =

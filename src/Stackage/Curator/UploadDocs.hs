@@ -15,11 +15,10 @@ import           Stackage.Prelude
 import qualified Codec.Archive.Tar             as Tar
 import qualified Codec.Archive.Tar.Entry       as Tar
 import           Control.Monad.Trans.Resource  (liftResourceT)
-import           Control.Monad.Trans.RWS.Ref   (MonadRWS, get, modify, put,
+import           Control.Monad.Trans.RWS.Ref   (get, modify, put,
                                                 runRWSRefT, RWSRefT, tell)
 import           Crypto.Hash                   (Digest, SHA256)
 import           Crypto.Hash.Conduit           (sinkHash)
-import           Data.ByteArray                (convert)
 import           Data.Conduit.Zlib             (WindowBits (WindowBits),
                                                 compress)
 import           Data.Function                 (fix)
@@ -52,13 +51,13 @@ upload :: (MonadResource m, MonadThrow m, PrimMonad m)
        -> Env
        -> Text
        -> Text
-       -> Consumer ByteString m ()
-upload toCompress env bucket name = do
+       -> ConduitT ByteString o m ()
+upload toCompress env' bucket name = do
     let mime = defaultMimeLookup name
 
     body <-
         if toCompress
-            then compress 9 (WindowBits 31) =$= sinkLazy
+            then compress 9 (WindowBits 31) .| sinkLazy
             else sinkLazy
 
     let po = set poContentType (Just $ decodeUtf8 mime)
@@ -71,7 +70,7 @@ upload toCompress env bucket name = do
 
     -- use ByteString output to ensure no interleaving of sending lines
     hPut stdout $ encodeUtf8 $ "Sending " ++ name ++ "\n"
-    _pors <- liftResourceT $ runAWS env $ send po
+    _pors <- liftResourceT $ runAWS env' $ send po
     return ()
 
 
@@ -82,7 +81,7 @@ uploadDocs :: FilePath -- ^ directory containing docs
            -> Text -- ^ bucket name
            -> IO ()
 uploadDocs input' bundleFile name bucket = do
-    env <- newEnv Discover
+    env' <- newEnv Discover
 
     unlessM (Dir.doesDirectoryExist input') $ error $ "Could not find directory: " ++ show input'
     input <- fmap (</> "") $ Dir.canonicalizePath input'
@@ -100,9 +99,9 @@ uploadDocs input' bundleFile name bucket = do
                       return Nothing)
               close = liftIO $ atomically $ writeTVar isOpenVar False
 
-              fillQueue = runResourceT $
+              fillQueue = runConduit
                 (sourceDirectoryDeep False input
-                  $$ mapM_C (liftIO . atomically . writeTBQueue queue))
+                  .| mapM_C (liftIO . atomically . writeTBQueue queue))
                 `finally` close
 
               srcQueue = fix $ \loop -> do
@@ -113,12 +112,12 @@ uploadDocs input' bundleFile name bucket = do
           runConcurrently $
             Concurrently fillQueue *>
               sequence_ (asList $ replicate threads
-                          (Concurrently (srcQueue $$ mapM_C (go input name))))
+                          (Concurrently (runConduit $ srcQueue .| mapM_C (go input name))))
     runResourceT $ do
-        ((), _, hoogles) <- runRWSRefT inner (env, bucket) mempty
+        ((), _, hoogles) <- runRWSRefT inner (env', bucket) mempty
 
         lbs <- liftIO $ fmap Tar.write $ mapM toEntry $ toList hoogles
-        flip runReaderT (env, bucket) $ do
+        flip runReaderT (env', bucket) $ do
             upload' True (name ++ "/hoogle/orig.tar") $ sourceLazy lbs
             upload' False (name ++ "/bundle.tar.xz") $ sourceFile bundleFile
 
@@ -131,12 +130,12 @@ toEntry fp = do
 upload' :: (MonadResource m, MonadReader (Env, Text) m)
         => Bool -- ^ compress?
         -> Text -- ^ S3 key
-        -> Source (ResourceT IO) ByteString
+        -> ConduitT () ByteString (ResourceT IO) ()
         -> m ()
 upload' toCompress name src = do
-    (env, bucket) <- ask
+    (env', bucket) <- ask
     let loop i = do
-            eres <- liftResourceT $ tryAny $ src $$ upload toCompress env bucket name
+            eres <- liftResourceT $ tryAny $ runConduit $ src .| upload toCompress env' bucket name
             case eres of
                 Left e
                     | i > maxAttempts -> throwIO e
@@ -173,16 +172,17 @@ go :: FilePath -- ^ prefix for all input
 go input name fp
     | isHoogleFile input fp = tell $! singletonSet fp
     | F.takeExtension fp == ".html" = do
-        doc <- sourceFile fp
-            $= eventConduit
-            $= (do
+        doc <- runConduit
+             $ sourceFile fp
+            .| eventConduit
+            .| (do
                     yield (Nothing, EventBeginDoctype "html" Nothing)
                     yield (Nothing, EventEndDoctype)
                     mapMC $ \e -> do
                         e' <- goEvent fp toRoot packageUrl e
                         return (Nothing, e')
                     )
-            $$ fromEvents
+            .| fromEvents
 
         -- Sink to a Document and then use blaze-html to render to avoid using
         -- XML rendering rules (e.g., empty elements)
@@ -245,7 +245,7 @@ getName src = do
 
 toHash :: FilePath -> M Text
 toHash src = do
-    (digest, lbs) <- sourceFile src $$ sink
+    (digest, lbs) <- runConduit $ sourceFile src .| sink
     let hash' = unpack $ decodeUtf8 $ asByteString $ convertToBase Base16 (digest :: Digest SHA256)
         name = pack $ "byhash" </> hash' F.<.> F.takeExtensions src
     (m, s) <- get

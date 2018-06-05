@@ -8,7 +8,7 @@ import System.Directory (doesFileExist, getAppUserDataDirectory)
 
 spec :: Spec
 spec = do
-    it "works" $ ifIndexExists $ (runResourceT $ sourcePackageIndex $$ sinkNull :: IO ())
+    it "works" $ ifIndexExists $ runConduitRes $ sourcePackageIndex .| sinkNull
     it "getLatestDescriptions gives reasonable results" $ ifIndexExists $ do
         let f x y = (display x, display y) `member` asSet (setFromList
                 [ (asText "base", asText "4.5.0.0")
