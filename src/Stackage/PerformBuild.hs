@@ -596,6 +596,8 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
                         tell' $ if hyped == ExitSuccess
                             then "--haddock-option=--hyperlinked-source"
                             else "--hyperlink-source"
+                        when (siGhcVersion (bpSystemInfo pbPlan) >= mkVersion [8, 4])
+                          $ tell' "--haddock-option=--quickjump"
                         tell' "--html"
                         when pbBuildHoogle $ tell' "--hoogle"
                         tell' "--html-location=../$pkg-$version/"
