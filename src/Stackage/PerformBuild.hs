@@ -274,7 +274,7 @@ performBuild' pb@PerformBuild {..} = withBuildDir $ \builddir -> do
 
     fixEnv (p, x)
         -- Thank you Windows having case-insensitive environment variables...
-        | toUpper p == "PATH" = (p, pbBinDir pb ++ pathSep : x)
+        | toUpper p == "PATH" = (p, x ++ pathSep : pbBinDir pb)
         | otherwise = (p, x)
 
     allowedEnv (k, _) = k `notMember` bannedEnvs
