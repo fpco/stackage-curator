@@ -29,7 +29,7 @@ import           Distribution.PackageDescription.PrettyPrint (writeGenericPackag
 import           Distribution.Types.UnqualComponentName
 import           Distribution.Version        (anyVersion)
 import           System.Directory            (canonicalizePath, createDirectoryIfMissing,
-                                              getCurrentDirectory,
+                                              getCurrentDirectory, listDirectory,
                                               removeDirectoryRecursive, renameDirectory, removeFile)
 import           Network.HTTP.Simple
 import           Stackage.BuildConstraints
@@ -44,6 +44,7 @@ import           System.Environment          (getEnvironment)
 import           System.Exit
 import           System.IO                   (IOMode (WriteMode),
                                               openBinaryFile)
+import           System.IO.Temp              (createTempDirectory)
 
 data BuildException = BuildException (Map PackageName BuildFailure) [Text]
     deriving Typeable
@@ -63,6 +64,7 @@ data BuildFailure = DependencyFailed PackageName
                   | ToolMissing ExeName
                   | NotImplemented
                   | BuildFailureException SomeException
+                  | BadArchive
     deriving (Show, Typeable)
 instance Exception BuildFailure
 
@@ -506,9 +508,10 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
                                 else do
                                     log' $ "Unpacking " ++ nameverrevhash ++ " (reason: " ++ reason ++ ")"
                                     case ppSourceUrl $ piPlan sbPackageInfo of
-                                        Nothing -> runParent getOutH "stack" ["unpack", nameverrevhash]
+                                        Nothing -> do
+                                          runParent getOutH "stack" ["unpack", nameverrevhash]
+                                          return $ sbBuildDir </> unpack namever
                                         Just url -> unpackFromURL sbBuildDir url
-                                    return $ sbBuildDir </> unpack namever
 
                             gpd <- createSetupHs childDir name pbAllowNewer
                             writeIORef gpdRef $ Just (gpd, childDir)
@@ -730,21 +733,31 @@ singleBuild pb@PerformBuild {..} registeredPackages SingleBuild {..} = do
                 Just bf -> bf
                 Nothing -> BuildFailureException exc
 
--- | Unpack the file at the given URL into the given directory
+-- | Unpack the file at the given URL into a subdirectory of the given directory.
+--
+-- If the archive consists of a single directory, return the path to that
+-- (unpacked) directory. Otherwise, throw 'BadArchive'.
 unpackFromURL :: MonadIO m
               => FilePath -- ^ dest directory
               -> Text -- ^ URL
-              -> m ()
+              -> m FilePath
 unpackFromURL destDir url = liftIO $ do
     req <- parseRequest $ unpack url
+    -- create a subdirectory within destDir so that we can isolate the
+    -- archive's contents
+    subdir <- createTempDirectory destDir "archive"
     withSystemTempFile "unpack-from-url.tar.gz" $ \fp h -> do
       httpSink req (const $ sinkHandle h)
       hClose h
       let cp = (proc "tar" ["xf", fp])
-                  { cwd = Just destDir
+                  { cwd = Just subdir
                   }
       withCheckedProcessCleanup cp
         $ \ClosedStream ClosedStream ClosedStream -> return ()
+      archiveEntries <- listDirectory subdir
+      case archiveEntries of
+        [name] -> return $ subdir </> name
+        _ -> throwIO BadArchive
 
 -- | Maximum time (in microseconds) to run a single test suite
 maximumTestSuiteTime :: Int
