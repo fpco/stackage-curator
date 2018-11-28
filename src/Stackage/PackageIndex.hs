@@ -99,6 +99,7 @@ data SimplifiedPackageDescription = SimplifiedPackageDescription
     , spdVersion :: Version
     , spdCabalFileInfo :: CabalFileInfo
     , spdCondLibrary :: Maybe (CondTree ConfVar [Dependency] SimplifiedComponentInfo)
+    , spdCondSubLibraries :: [(String, CondTree ConfVar [Dependency] SimplifiedComponentInfo)]
     , spdCondExecutables :: [(String, CondTree ConfVar [Dependency] SimplifiedComponentInfo)]
     , spdCondTestSuites :: [(String, CondTree ConfVar [Dependency] SimplifiedComponentInfo)]
     , spdCondBenchmarks :: [(String, CondTree ConfVar [Dependency] SimplifiedComponentInfo)]
@@ -168,6 +169,7 @@ gpdToSpd raw gpd = SimplifiedPackageDescription
                     ]
         }
     , spdCondLibrary = mapCondTree simpleLib <$> condLibrary gpd
+    , spdCondSubLibraries = map unqual $ map (fmap $ mapCondTree simpleLib) $ condSubLibraries gpd
     , spdCondExecutables = map unqual $ map (fmap $ mapCondTree simpleExe) $ condExecutables gpd
     , spdCondTestSuites = map unqual $ map (fmap $ mapCondTree simpleTest) $ condTestSuites gpd
     , spdCondBenchmarks = map unqual $ map (fmap $ mapCondTree simpleBench) $ condBenchmarks gpd
