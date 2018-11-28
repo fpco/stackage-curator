@@ -34,7 +34,7 @@ toSimpleDesc :: MonadThrow m
              => CheckCond
              -> SimplifiedPackageDescription
              -> m SimpleDesc
-toSimpleDesc cc spd = execWriterT $ do
+toSimpleDesc cc spd = adjustForInternalLibDeps $ execWriterT $ do
     forM_ (spdCondLibrary spd) $ tellTree cc CompLibrary
     forM_ (spdCondExecutables spd) $ tellTree cc CompExecutable . snd
     tell mempty { sdProvidedExes = setFromList
@@ -55,6 +55,31 @@ toSimpleDesc cc spd = execWriterT $ do
         $ tellTree cc CompTestSuite . snd
     when (ccIncludeBenchmarks cc) $ forM_ (spdCondBenchmarks spd)
         $ tellTree cc CompBenchmark . snd
+  where
+    adjustForInternalLibDeps :: (MonadThrow m) => m SimpleDesc -> m SimpleDesc
+    adjustForInternalLibDeps = removeInternalLibsAsDeps . addDepsFromInternalLibs
+    removeInternalLibsAsDeps :: (MonadThrow m) => m SimpleDesc -> m SimpleDesc
+    removeInternalLibsAsDeps mdesc = do
+      desc <- mdesc
+      let removeUs :: [PackageName]
+          removeUs = map (mkPackageName . fst) $ spdCondSubLibraries spd
+      pure (foldr deleteDep desc removeUs) -- TODO: fixme
+    -- TODO: address known shortcoming:
+    -- Includes all internal lib transitive deps,
+    -- whether they are used by the main lib or not
+    addDepsFromInternalLibs :: (MonadThrow m) => m SimpleDesc -> m SimpleDesc
+    addDepsFromInternalLibs mdesc = do
+        desc <- mdesc
+        desc' <- mdesc'
+        pure (desc <> desc')
+      where
+        mdesc' = execWriterT $ do
+          forM_ (spdCondSubLibraries spd) $ \ (libName, libCondTree) -> do
+            tellTree cc CompLibrary libCondTree
+
+-- | Delete a single dependency from a SimpleDesc
+deleteDep :: PackageName -> SimpleDesc -> SimpleDesc
+deleteDep pkgName d = d { sdPackages = deleteMap pkgName (sdPackages d) }
 
 -- | Convert a single CondTree to a 'SimpleDesc'.
 tellTree :: (MonadWriter SimpleDesc m, MonadThrow m)
