@@ -1,3 +1,7 @@
+## 0.17.1.0
+
+* Bump to LTS 13.1 and Cabal 2.4
+
 ## 0.17.0.0
 
 * Code cleanup, remove deprecated commands

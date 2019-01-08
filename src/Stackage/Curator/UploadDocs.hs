@@ -110,7 +110,7 @@ uploadDocs input' name bucket = do
                   Just res -> yield res >> loop
           runConcurrently $
             Concurrently fillQueue *>
-              sequence_ (asList $ replicate threads
+              sequence_ (asList $ replicate (fromIntegral threads)
                           (Concurrently (runConduit $ srcQueue .| mapM_C (go input name))))
     runResourceT $ do
         ((), _, hoogles) <- runRWSRefT inner (env', bucket) mempty

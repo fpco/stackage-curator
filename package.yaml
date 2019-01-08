@@ -1,5 +1,5 @@
 name:                stackage-curator
-version:             0.17.0.0
+version:             0.17.1.0
 synopsis:            Tools for curating Stackage bundles
 description:         Please see <http://www.stackage.org/package/stackage-curator> for a description and documentation.
 github:              fpco/stackage-curator
@@ -17,7 +17,7 @@ extra-source-files:
 dependencies:
 - base >= 4 && < 5
 - containers
-- Cabal >= 2.2 && < 2.3
+- Cabal >= 2.4 && < 2.5
 - tar >= 0.3
 - zlib
 - bytestring
@@ -41,7 +41,7 @@ dependencies:
 - http-client-tls
 - temporary
 - data-default-class
-- stm
+- stm >= 2.5
 - mono-traversable
 - async
 - streaming-commons >= 0.1.7.1
