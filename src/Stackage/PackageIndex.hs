@@ -56,7 +56,8 @@ getPackageIndexPath :: MonadIO m => m FilePath
 getPackageIndexPath = liftIO $ do
     stackRoot <- getAppUserDataDirectory "stack"
     let tarballs =
-            [ stackRoot </> "indices" </> "Hackage" </> "01-index.tar"
+            [ stackRoot </> "pantry" </> "hackage" </> "00-index.tar" -- Stack 2
+            , stackRoot </> "indices" </> "Hackage" </> "01-index.tar"
             , stackRoot </> "indices" </> "Hackage" </> "00-index.tar"
             ]
         loop [] = error $ "tarballs not found: " ++ show tarballs
