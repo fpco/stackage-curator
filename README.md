@@ -1,5 +1,7 @@
 ## stackage-curator
 
+__NOTE__ This repo is no longer used by the curator team. Instead, we've moved over to a new tool that leverages pantry at: https://github.com/commercialhaskell/curator/
+
 [![Build Status](https://travis-ci.org/fpco/stackage-curator.svg?branch=master)](https://travis-ci.org/fpco/stackage-curator)
 [![Hackage](http://img.shields.io/hackage/v/stackage-curator.png)](http://hackage.haskell.org/package/stackage-curator)
 [![Stackage LTS](http://stackage.org/package/stackage-curator/badge/lts)](http://stackage.org/lts/package/stackage-curator)
